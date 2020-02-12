@@ -20,6 +20,12 @@
  */
 
 @objcMembers public class PersistenceService: NSObject {
+    
+    public lazy var permissions: DataPermission = {
+        let _permissions = DataPermission()
+        return _permissions
+    }()
+
 
     public func ofTable(_ tableName: String) -> MapDrivenDataStore {
         return MapDrivenDataStore(tableName: tableName)
@@ -33,8 +39,13 @@
         PersistenceServiceUtils().describe(tableName: tableName, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
-    public lazy var permissions: DataPermission = {
-        let _permissions = DataPermission()
-        return _permissions
-    }()
+    public func clearLocalDatabase() {
+        var localManager = LocalManager(tableName: "")
+        let tableNames = localManager.getTables()
+        for tableName in tableNames {
+            localManager = LocalManager(tableName: tableName)
+            localManager.dropTable()
+        }
+        //TransactionsManager.shared.removeAllTransactions()
+    }
 }

@@ -255,28 +255,28 @@ class PersistenceServiceUtils: NSObject {
         
         if relationsPageSize != nil {
             restMethod += "?relationsPageSize=\(relationsPageSize!)"
-            if related != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
                 let relatedString = dataTypesUtils.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
                 let relatedString = dataTypesUtils.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
                 restMethod += "&relationsDepth=" + String(relationsDepth!)
             }
         }
         else {
-            if related != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
                 let relatedString = dataTypesUtils.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
                 let relatedString = dataTypesUtils.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
                 restMethod += "?relationsDepth=" + String(relationsDepth!)
             }
         }  

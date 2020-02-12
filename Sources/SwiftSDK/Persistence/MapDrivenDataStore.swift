@@ -28,11 +28,13 @@
     private var tableName: String
     
     private let persistenceServiceUtils = PersistenceServiceUtils()
+    private let persistenceServiceUtilsLocal: PersistenceServiceUtilsLocal
     
     init(tableName: String) {
         self.tableName = tableName
-        persistenceServiceUtils.setup(tableName: tableName)
         self.rt = RTFactory.shared.createEventHandlerForMap(tableName: tableName)
+        persistenceServiceUtils.setup(tableName: tableName)
+        persistenceServiceUtilsLocal = PersistenceServiceUtilsLocal(tableName: tableName)
     }
     
     public func save(entity: [String : Any], responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -140,5 +142,36 @@
     
     public func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+    }
+    
+    public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        persistenceServiceUtilsLocal.initLocalDatabase(whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
+    }
+    
+    public func clearLocalDatabase() {
+        persistenceServiceUtilsLocal.clearLocalDatabase()
+    }
+    
+    public func saveEventually(entity: inout Any) {
+        persistenceServiceUtilsLocal.saveEventually(entity: &entity)
+    }
+    
+    public func removeEventually() {
+        persistenceServiceUtilsLocal.removeEventually()
+    }
+    
+    // ***********************
+    
+    // remove later
+    
+    public func findLocal() {
+        persistenceServiceUtilsLocal.findLocal(whereClause: "objectId!=NULL", properties: nil, limit: nil, offset: nil, sortBy: nil, groupBy: nil, having: nil, responseHandler: { localObjects in
+            print("localObjects count = \(localObjects.count):")
+            for local in localObjects {
+                print(local)
+            }
+        }, errorHandler: { fault in
+            print("⚠️ Error: \(fault.message ?? "")")
+        })
     }
 }

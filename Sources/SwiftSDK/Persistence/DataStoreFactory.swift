@@ -237,4 +237,14 @@
         }
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: wrappedBlock, errorHandler: errorHandler)
     }
+    
+    // *************************************************
+    
+    public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        
+    }
+    
+    public func clearLocalDatabase() {
+        
+    }
 }
