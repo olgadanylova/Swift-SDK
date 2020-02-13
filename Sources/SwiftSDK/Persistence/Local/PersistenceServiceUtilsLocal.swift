@@ -87,82 +87,19 @@ class PersistenceServiceUtilsLocal {
     }
     
     func saveEventually(entity: inout Any) {
-        
         localManager.createTableIfNotExist()
         let entityRef = getObjectReference(object: &entity)
-        
         if var entityDict = entity as? [String : Any] {
             if ConnectionManager.isConnectedToNetwork() {
-                if entityDict["objectId"] == nil, !referenceExists(entityRef) {
-                    createEventually(entityRef: entityRef, entityDict: entityDict)
-                }
-                else if let objectId = entityDict["objectId"] as? String, !referenceExists(entityRef) {
-                    if let foundObjects = localManager.select(whereClause: "objectId='\(objectId)'") as? [[String : Any]],
-                        let object = foundObjects.first {
-                        objectToDbReferences[entityRef] = object["blLocalId"] as? Int
-                        self.updateEventually(entityRef: entityRef, entityDict: entityDict)
-                    }
-                    else {
-                        psu.findFirstOrLastOrById(first: false, last: false, objectId: objectId, queryBuilder: nil, responseHandler: { found in
-                            self.objectToDbReferences[entityRef] = self.localManager.insert(object: found)
-                        }, errorHandler: { fault in
-                            // ⚠️ call onFindError
-                        })
-                    }
-                }
-                else if entityDict["objectId"] == nil, referenceExists(entityRef) {
-                    let blLocalId = objectToDbReferences[entityRef]!
-                    if let foundObjects = localManager.select(whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]],
-                        let object = foundObjects.first,
-                        let objectId = object["objectId"] as? String {
-                        entityDict["objectId"] = objectId
-                        self.updateEventually(entityRef: entityRef, entityDict: entityDict)
-                    }
-                }
-                else if let objectId = entityDict["objectId"] as? String, referenceExists(entityRef) {
-                    let blLocalId = objectToDbReferences[entityRef]!
-                    if let foundObjects = localManager.select(whereClause: "objectId='\(objectId)' AND blLocalId=\(blLocalId)") as? [[String : Any]],
-                        foundObjects.first != nil {
-                        self.updateEventually(entityRef: entityRef, entityDict: entityDict)
-                    }
-                    else if let foundObjects = localManager.select(whereClause: "objectId='\(objectId)'") as? [[String : Any]],
-                        let object = foundObjects.first {
-                        objectToDbReferences[entityRef] = object["blLocalId"] as? Int
-                        self.updateEventually(entityRef: entityRef, entityDict: entityDict)
-                    }
-                    else if let foundObjects = localManager.select(whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]],
-                        let object = foundObjects.first,
-                        let objectId = object["objectId"] as? String {
-                        entityDict["objectId"] = objectId
-                        self.updateEventually(entityRef: entityRef, entityDict: entityDict)
-                    }
-                }
+                saveEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef)
             }
             else {
-                print("🔴")
-                // ⚠️ save locally and create transaction for future
+                saveEventuallyWhenOffline(entityDict: &entityDict, entityRef: entityRef)
             }
         }
-        else { // entity is not Dictionary
-            
+        else {
+            // entity is not Dictionary
         }
-    }
-    
-    private func createEventually(entityRef: UnsafeMutablePointer<Any>?, entityDict: [String : Any]) {
-        psu.create(entity: entityDict, responseHandler: { created in
-            self.objectToDbReferences[entityRef] = self.localManager.insert(object: created)
-        }, errorHandler: { fault in
-            // ⚠️ call onSaveError
-        })
-    }
-    
-    private func updateEventually(entityRef: UnsafeMutablePointer<Any>?, entityDict: [String : Any]) {
-        psu.update(entity: entityDict, responseHandler: { updated in
-            guard let objectId = entityDict["objectId"] as? String else { return }
-            self.localManager.update(newValues: updated, whereClause: "objectId='\(objectId)'")
-        }, errorHandler: { fault in
-            // ⚠️ call onSaveError
-        })
     }
     
     func removeEventually() {
@@ -174,7 +111,7 @@ class PersistenceServiceUtilsLocal {
     func findLocal(whereClause: String?, properties: [String]?, limit: Int?, offset: Int?, sortBy: [String]?, groupBy: [String]?, having: String?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let result = localManager.select(properties: properties, whereClause: whereClause, limit: limit, offset: offset, orderBy: sortBy, groupBy: groupBy, having: having)
         if result is [[String : Any]] {
-            // ⚠️⚠️⚠️⚠️⚠️⚠️ remove unnecessary fields
+            // ⚠️⚠️⚠️⚠️⚠️⚠️ remove unnecessary fields before return
             responseHandler(result as! [[String : Any]])
         }
         else if result is Fault {
@@ -184,19 +121,108 @@ class PersistenceServiceUtilsLocal {
     
     // **************************************
     
-    private func getObjectReference(object: inout Any) -> UnsafeMutablePointer<Any>? {
+    private func getObjectReference(object: inout Any) -> UnsafeMutablePointer<Any> {
         withUnsafeMutablePointer(to: &object, { reference in
             return reference
         })
     }
     
-    private func referenceExists(_ reference: UnsafeMutablePointer<Any>?) -> Bool {
-        if reference != nil, Array(objectToDbReferences.keys).contains(reference) {
-            return true
+    private func saveEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>) {
+        let semaphore = DispatchSemaphore(value: 0)
+        if let objectId = entityDict["objectId"] as? String {
+            if let blLocalId = objectToDbReferences[entityRef] {
+                DispatchQueue.global().async {
+                    self.psu.update(entity: entityDict, responseHandler: { updated in
+                        let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
+                        if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
+                            localObjects.first != nil {
+                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                        }
+                        else {
+                            let blLocalId = self.localManager.insert(object: updated)
+                            self.objectToDbReferences[entityRef] = blLocalId
+                        }
+                        semaphore.signal()
+                    }, errorHandler: { fault in
+                        // ⚠️ call onSaveError
+                        semaphore.signal()
+                    })
+                }
+            }
+            else {
+                DispatchQueue.global().async {
+                    self.psu.update(entity: entityDict, responseHandler: { updated in
+                        let whereClause = "objectId='\(objectId)'"
+                        if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
+                            localObjects.first != nil {
+                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                        }
+                        else {
+                            let blLocalId = self.localManager.insert(object: updated)
+                            self.objectToDbReferences[entityRef] = blLocalId
+                        }
+                        semaphore.signal()
+                    }, errorHandler: { fault in
+                        // ⚠️ call onSaveError
+                        semaphore.signal()
+                    })
+                }
+            }
         }
-        return false
+        else {
+            if let blLocalId = objectToDbReferences[entityRef] {
+                let whereClause = "blLocalId=\(blLocalId)"
+                if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
+                    let localObject = localObjects.first,
+                    let objectId = localObject["objectId"] as? String {
+                    var entityToUpdate = entityDict
+                    entityToUpdate["objectId"] = objectId
+                    DispatchQueue.global().async {
+                        self.psu.update(entity: entityToUpdate, responseHandler: { updated in
+                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                            semaphore.signal()
+                        }, errorHandler: { fault in
+                            // ⚠️ call onSaveError
+                            semaphore.signal()
+                        })
+                    }
+                }
+                else {
+                    DispatchQueue.global().async {
+                        self.psu.create(entity: entityDict, responseHandler: { created in
+                            let blLocalId = self.localManager.insert(object: created)
+                            self.objectToDbReferences[entityRef] = blLocalId
+                            semaphore.signal()
+                        }, errorHandler: { fault in
+                            // ⚠️ call onSaveError
+                            semaphore.signal()
+                        })
+                    }
+                }
+            }
+            else {
+                DispatchQueue.global().async {
+                    self.psu.create(entity: entityDict, responseHandler: { created in
+                        let blLocalId = self.localManager.insert(object: created)
+                        self.objectToDbReferences[entityRef] = blLocalId
+                        semaphore.signal()
+                    }, errorHandler: { fault in
+                        // ⚠️ call onSaveError
+                        semaphore.signal()
+                    })
+                }
+            }
+        }
+        semaphore.wait()
+        return
+    }
+    
+    private func saveEventuallyWhenOffline(entityDict: inout [String : Any], entityRef: UnsafeMutablePointer<Any>) {
+        // TODO
     }
 }
+
+// *********************************************************
 
 /*
  func saveEventually(entity: [String : Any]) {
