@@ -24,34 +24,30 @@ class PersistenceServiceUtilsLocal {
     private var localManager: LocalManager
     private var tableName: String = ""
     private var objectToDbReferences = [AnyHashable : Int]()
+    private var persistenceServiceUtils: PersistenceServiceUtils
     
-    private let psu = PersistenceServiceUtils()
     private let connectionManager = ConnectionManager()
     
     init(tableName: String) {
         self.tableName = tableName
         localManager = LocalManager(tableName: tableName)
-        psu.setup(tableName: tableName)
+        persistenceServiceUtils = PersistenceServiceUtils(tableName: self.tableName)
     }
     
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        var recordsCount: Any = 0
-        let tableExists = localManager.tableExists(tableName: tableName)
-        if tableExists {
-            recordsCount = localManager.getNumberOfRecords(whereClause: nil)
-            if recordsCount is Fault {
-                errorHandler(recordsCount as! Fault)
-            }
-            if recordsCount is Int, recordsCount as! Int > 0 {
-                errorHandler(Fault(message: "Table '\(tableName)' already has records"))
-            }
+        localManager.createTableIfNotExist()
+        let recordsCount: Any = localManager.getNumberOfRecords(whereClause: nil)
+        if recordsCount is Fault {
+            errorHandler(recordsCount as! Fault)
+        }
+        if recordsCount is Int, recordsCount as! Int > 0 {
+            errorHandler(Fault(message: "Table '\(tableName)' already has records"))
         }
         else {
-            localManager.createTableIfNotExist()
             let queryBuilder = DataQueryBuilder()
             queryBuilder.setWhereClause(whereClause: whereClause)
             queryBuilder.setPageSize(pageSize: 100)
-            psu.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
+            persistenceServiceUtils.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
                 if foundObjects.count > 0 {
                     for object in foundObjects {
                         self.localManager.initInsert(object: object, errorHandler: errorHandler)
@@ -65,8 +61,10 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
+    
+    
     private func nextPage(queryBuilder: DataQueryBuilder, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        psu.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
+        persistenceServiceUtils.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
             for object in foundObjects {
                 self.localManager.initInsert(object: object, errorHandler: errorHandler)
             }
@@ -86,15 +84,15 @@ class PersistenceServiceUtilsLocal {
         //TransactionsManager.shared.removeAllTransactions()
     }
     
-    func saveEventually(entity: inout Any) {
+    func saveEventually(entity: inout Any, callback: OfflineAwareCallback?) {
         localManager.createTableIfNotExist()
         let entityRef = getObjectReference(object: &entity)
-        if var entityDict = entity as? [String : Any] {
+        if let entityDict = entity as? [String : Any] {
             if ConnectionManager.isConnectedToNetwork() {
-                saveEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef)
+                saveEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef, callback: callback)
             }
             else {
-                saveEventuallyWhenOffline(entityDict: &entityDict, entityRef: entityRef)
+                saveEventuallyWhenOffline(entityDict: entityDict, entityRef: entityRef, callback: callback)
             }
         }
         else {
@@ -102,11 +100,22 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
-    func removeEventually() {
-        if localManager.tableExists(tableName: tableName) {
-            localManager.removeLocally(whereClause: "blLocalId = 3")
+    func removeEventually(entity: inout Any, callback: OfflineAwareCallback?) {
+        let entityRef = getObjectReference(object: &entity)
+        if var entityDict = entity as? [String : Any] {
+            if ConnectionManager.isConnectedToNetwork() {
+                removeEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef, callback: callback)
+            }
+            else {
+                removeEventuallyWhenOffline(entityDict: &entityDict, entityRef: entityRef, callback: callback)
+            }
+        }
+        else {
+             // entity is not Dictionary
         }
     }
+    
+    // ********************************************************************
     
     func findLocal(whereClause: String?, properties: [String]?, limit: Int?, offset: Int?, sortBy: [String]?, groupBy: [String]?, having: String?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let result = localManager.select(properties: properties, whereClause: whereClause, limit: limit, offset: offset, orderBy: sortBy, groupBy: groupBy, having: having)
@@ -127,43 +136,45 @@ class PersistenceServiceUtilsLocal {
         })
     }
     
-    private func saveEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>) {
+    private func saveEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
         let semaphore = DispatchSemaphore(value: 0)
         if let objectId = entityDict["objectId"] as? String {
             if let blLocalId = objectToDbReferences[entityRef] {
                 DispatchQueue.global().async {
-                    self.psu.update(entity: entityDict, responseHandler: { updated in
+                    self.persistenceServiceUtils.update(entity: entityDict, responseHandler: { updated in
+                        callback?.remoteResponseHandler?(updated)
                         let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
                         if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
                             localObjects.first != nil {
-                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
                         }
                         else {
-                            let blLocalId = self.localManager.insert(object: updated)
-                            self.objectToDbReferences[entityRef] = blLocalId
+                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: updated, callback: callback)
                         }
                         semaphore.signal()
                     }, errorHandler: { fault in
-                        // ⚠️ call onSaveError
+                        callback?.remoteErrorHandler?(fault)
                         semaphore.signal()
                     })
                 }
             }
             else {
                 DispatchQueue.global().async {
-                    self.psu.update(entity: entityDict, responseHandler: { updated in
+                    self.persistenceServiceUtils.update(entity: entityDict, responseHandler: { updated in
+                        callback?.remoteResponseHandler?(updated)
                         let whereClause = "objectId='\(objectId)'"
                         if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
                             localObjects.first != nil {
-                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
                         }
                         else {
-                            let blLocalId = self.localManager.insert(object: updated)
-                            self.objectToDbReferences[entityRef] = blLocalId
+                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: updated, callback: callback)
                         }
                         semaphore.signal()
                     }, errorHandler: { fault in
-                        // ⚠️ call onSaveError
+                        callback?.remoteErrorHandler?(fault)
                         semaphore.signal()
                     })
                 }
@@ -178,23 +189,25 @@ class PersistenceServiceUtilsLocal {
                     var entityToUpdate = entityDict
                     entityToUpdate["objectId"] = objectId
                     DispatchQueue.global().async {
-                        self.psu.update(entity: entityToUpdate, responseHandler: { updated in
-                            self.localManager.update(newValues: updated, whereClause: whereClause)
+                        self.persistenceServiceUtils.update(entity: entityToUpdate, responseHandler: { updated in
+                            callback?.remoteResponseHandler?(updated)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
                             semaphore.signal()
                         }, errorHandler: { fault in
-                            // ⚠️ call onSaveError
+                            callback?.remoteErrorHandler?(fault)
                             semaphore.signal()
                         })
                     }
                 }
                 else {
                     DispatchQueue.global().async {
-                        self.psu.create(entity: entityDict, responseHandler: { created in
-                            let blLocalId = self.localManager.insert(object: created)
-                            self.objectToDbReferences[entityRef] = blLocalId
+                        self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
+                            callback?.remoteResponseHandler?(created)
+                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: created, callback: callback)
                             semaphore.signal()
                         }, errorHandler: { fault in
-                            // ⚠️ call onSaveError
+                            callback?.remoteErrorHandler?(fault)
                             semaphore.signal()
                         })
                     }
@@ -202,12 +215,13 @@ class PersistenceServiceUtilsLocal {
             }
             else {
                 DispatchQueue.global().async {
-                    self.psu.create(entity: entityDict, responseHandler: { created in
-                        let blLocalId = self.localManager.insert(object: created)
-                        self.objectToDbReferences[entityRef] = blLocalId
+                    self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
+                        callback?.remoteResponseHandler?(created)
+                        callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                        self.localManager.insert(object: created, callback: callback)
                         semaphore.signal()
                     }, errorHandler: { fault in
-                        // ⚠️ call onSaveError
+                        callback?.remoteErrorHandler?(fault)
                         semaphore.signal()
                     })
                 }
@@ -217,8 +231,69 @@ class PersistenceServiceUtilsLocal {
         return
     }
     
-    private func saveEventuallyWhenOffline(entityDict: inout [String : Any], entityRef: UnsafeMutablePointer<Any>) {
+    private func saveEventuallyWhenOffline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
         // TODO
+    }
+    
+    private func removeEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
+        let semaphore = DispatchSemaphore(value: 0)
+        if let objectId = entityDict["objectId"] as? String {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
+                    callback?.remoteResponseHandler?(removed)
+                    callback?.localResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    let whereClause = "objectId='\(objectId)'"
+                    self.localManager.delete(whereClause: whereClause, callback: callback)
+                    semaphore.signal()
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+        else if let blLocalId = objectToDbReferences[entityRef] {
+            let whereClause = "blLocalId=\(blLocalId)"
+            if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
+                let objectToDelete = localObjects.first,
+                let objectId = objectToDelete["objectId"] as? String {
+                DispatchQueue.global().async {
+                    self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
+                        callback?.remoteResponseHandler?(removed)
+                        callback?.localResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                        self.localManager.delete(whereClause: whereClause, callback: callback)
+                        semaphore.signal()
+                    }, errorHandler: { fault in
+                        callback?.remoteErrorHandler?(fault)
+                        semaphore.signal()
+                    })
+                }        
+            }
+        }
+        semaphore.wait()
+        return
+    }
+    
+    private func removeEventuallyWhenOffline(entityDict: inout [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
+        // TODO
+    }
+    
+    private func wrapSaveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
+        let wrappedHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any],
+                let localId = response["blLocalId"] as? Int64 {
+                self.objectToDbReferences[entityRef] = Int(localId)
+                localResponseHandler?(response)
+            }
+        }
+        return wrappedHandler
+    }
+    
+    private func wrapRemoveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
+        let wrappedHandler: (Any) -> () = { response in
+            self.objectToDbReferences[entityRef] = nil
+            localResponseHandler?(response)
+        }
+        return wrappedHandler
     }
 }
 

@@ -25,6 +25,7 @@
 		5E03A3C122294A4B005A538D /* PublishMessageInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E03A3C022294A4B005A538D /* PublishMessageInfo.swift */; };
 		5E03A3C322296D03005A538D /* CommandObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E03A3C222296D03005A538D /* CommandObject.swift */; };
 		5E03A3C52229711F005A538D /* UserStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E03A3C42229711F005A538D /* UserStatus.swift */; };
+		5E06AD4D23F6759700950993 /* PersistenceHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E06AD4C23F6759700950993 /* PersistenceHelper.swift */; };
 		5E09B00C22645B9A0073DA5E /* Logging.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E09B00B22645B9A0073DA5E /* Logging.swift */; };
 		5E09B00E22645BBC0073DA5E /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E09B00D22645BBC0073DA5E /* Logger.swift */; };
 		5E09B01022645BCF0073DA5E /* LogBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E09B00F22645BCF0073DA5E /* LogBuffer.swift */; };
@@ -95,6 +96,7 @@
 		5E8A2A22226EF7DA007C2BAA /* CacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A21226EF7DA007C2BAA /* CacheService.swift */; };
 		5E8A2A24226EFA16007C2BAA /* NoReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A23226EFA16007C2BAA /* NoReply.swift */; };
 		5E8A2A27226F2BF4007C2BAA /* CacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A26226F2BF4007C2BAA /* CacheTests.swift */; };
+		5E8F81E523FA7B6600567626 /* OfflineAwareCallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */; };
 		5E90721121B66E9E00619C0D /* Fault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E90721021B66E9E00619C0D /* Fault.swift */; };
 		5E922249225B8CCF0001688F /* GeoQueryRectangle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E922248225B8CCF0001688F /* GeoQueryRectangle.swift */; };
 		5E92224B225BAA8C0001688F /* GeoCluster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E92224A225BAA8C0001688F /* GeoCluster.swift */; };
@@ -342,6 +344,7 @@
 		5E03A3C022294A4B005A538D /* PublishMessageInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PublishMessageInfo.swift; sourceTree = "<group>"; };
 		5E03A3C222296D03005A538D /* CommandObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandObject.swift; sourceTree = "<group>"; };
 		5E03A3C42229711F005A538D /* UserStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserStatus.swift; sourceTree = "<group>"; };
+		5E06AD4C23F6759700950993 /* PersistenceHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceHelper.swift; sourceTree = "<group>"; };
 		5E09B00B22645B9A0073DA5E /* Logging.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logging.swift; sourceTree = "<group>"; };
 		5E09B00D22645BBC0073DA5E /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		5E09B00F22645BCF0073DA5E /* LogBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogBuffer.swift; sourceTree = "<group>"; };
@@ -409,6 +412,7 @@
 		5E8A2A21226EF7DA007C2BAA /* CacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheService.swift; sourceTree = "<group>"; };
 		5E8A2A23226EFA16007C2BAA /* NoReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoReply.swift; sourceTree = "<group>"; };
 		5E8A2A26226F2BF4007C2BAA /* CacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheTests.swift; sourceTree = "<group>"; };
+		5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAwareCallback.swift; sourceTree = "<group>"; };
 		5E90721021B66E9E00619C0D /* Fault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fault.swift; sourceTree = "<group>"; };
 		5E922248225B8CCF0001688F /* GeoQueryRectangle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoQueryRectangle.swift; sourceTree = "<group>"; };
 		5E92224A225BAA8C0001688F /* GeoCluster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoCluster.swift; sourceTree = "<group>"; };
@@ -691,6 +695,7 @@
 				5E4DE64221EF8E92009AE503 /* Mappings.swift */,
 				5A2A785021E6114800EC8007 /* PersistenceService.swift */,
 				5AC54CA521E7373400EC1F8C /* PersistenceServiceUtils.swift */,
+				5E06AD4C23F6759700950993 /* PersistenceHelper.swift */,
 				5EA2B69A21F2324B00CFDC37 /* StoredObjects.swift */,
 				5E9DFC062387F70E0019E750 /* Geometry */,
 				5E78C00423F2B73F003AE9B0 /* Local */,
@@ -893,6 +898,7 @@
 				5E99C1A523F2BB38000AF689 /* Grammar */,
 				5E78C00223F2B6C7003AE9B0 /* PersistenceServiceUtilsLocal.swift */,
 				5E78C00523F2B7B1003AE9B0 /* LocalManager.swift */,
+				5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */,
 			);
 			path = Local;
 			sourceTree = "<group>";
@@ -1640,6 +1646,7 @@
 				5E99C27E23F2BB39000AF689 /* Trees.swift in Sources */,
 				5E99C2C423F2BB39000AF689 /* LexerAction.swift in Sources */,
 				5ECAB231238C41A60051F315 /* BLGeometry.swift in Sources */,
+				5E8F81E523FA7B6600567626 /* OfflineAwareCallback.swift in Sources */,
 				5E99C2CD23F2BB39000AF689 /* ATNDeserializer.swift in Sources */,
 				5E99C2A123F2BB39000AF689 /* IntStream.swift in Sources */,
 				5E8A2A24226EFA16007C2BAA /* NoReply.swift in Sources */,
@@ -1753,6 +1760,7 @@
 				5EA87B95221D720100A8B93F /* RTListener.swift in Sources */,
 				5E99C28E23F2BB39000AF689 /* DFA.swift in Sources */,
 				5E99C29323F2BB39000AF689 /* TokenStream.swift in Sources */,
+				5E06AD4D23F6759700950993 /* PersistenceHelper.swift in Sources */,
 				5ED765D02224369E009431CD /* BulkEvent.swift in Sources */,
 				5E99C2EE23F2BB39000AF689 /* ParserRuleContext.swift in Sources */,
 				5E72EABD21F6EB89006C8C5C /* DataQueryBuilder.swift in Sources */,

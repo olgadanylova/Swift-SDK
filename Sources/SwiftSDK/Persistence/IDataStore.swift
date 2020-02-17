@@ -8,7 +8,7 @@
  *
  *  ********************************************************************************************************************
  *
- *  Copyright 2019 BACKENDLESS.COM. All Rights Reserved.
+ *  Copyright 2020 BACKENDLESS.COM. All Rights Reserved.
  *
  *  NOTICE: All information contained herein is, and remains the property of Backendless.com and its suppliers,
  *  if any. The intellectual and technical concepts contained herein are proprietary to Backendless.com and its
@@ -55,4 +55,9 @@ protocol IDataStore {
     
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
     func clearLocalDatabase()
+    
+    func saveEventually(entity: inout Any)
+    func saveEventually(entity: inout Any, callback: OfflineAwareCallback)
+    func removeEventually(entity: inout Any)
+    func removeEventually(entity: inout Any, callback: OfflineAwareCallback)
 }

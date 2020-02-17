@@ -8,7 +8,7 @@
  *
  *  ********************************************************************************************************************
  *
- *  Copyright 2019 BACKENDLESS.COM. All Rights Reserved.
+ *  Copyright 2020 BACKENDLESS.COM. All Rights Reserved.
  *
  *  NOTICE: All information contained herein is, and remains the property of Backendless.com and its suppliers,
  *  if any. The intellectual and technical concepts contained herein are proprietary to Backendless.com and its
@@ -26,14 +26,13 @@
     public var rt: EventHandlerForMap!
     
     private var tableName: String
-    
-    private let persistenceServiceUtils = PersistenceServiceUtils()
-    private let persistenceServiceUtilsLocal: PersistenceServiceUtilsLocal
+    private var persistenceServiceUtils: PersistenceServiceUtils
+    private var persistenceServiceUtilsLocal: PersistenceServiceUtilsLocal
     
     init(tableName: String) {
         self.tableName = tableName
-        self.rt = RTFactory.shared.createEventHandlerForMap(tableName: tableName)
-        persistenceServiceUtils.setup(tableName: tableName)
+        self.rt = RTFactory.shared.createEventHandlerForMap(tableName: tableName)        
+        persistenceServiceUtils = PersistenceServiceUtils(tableName: self.tableName)
         persistenceServiceUtilsLocal = PersistenceServiceUtilsLocal(tableName: tableName)
     }
     
@@ -144,6 +143,8 @@
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
+    // *************************************************
+    
     public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtilsLocal.initLocalDatabase(whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
     }
@@ -153,16 +154,28 @@
     }
     
     public func saveEventually(entity: inout Any) {
-        persistenceServiceUtilsLocal.saveEventually(entity: &entity)
+        persistenceServiceUtilsLocal.saveEventually(entity: &entity, callback: nil)
     }
     
-    public func removeEventually() {
-        persistenceServiceUtilsLocal.removeEventually()
+    public func saveEventually(entity: inout Any, callback: OfflineAwareCallback) {
+        persistenceServiceUtilsLocal.saveEventually(entity: &entity, callback: callback)
     }
     
-    // ***********************
+    public func removeEventually(entity: inout Any) {
+        persistenceServiceUtilsLocal.removeEventually(entity: &entity, callback: nil)
+    }
+    
+    public func removeEventually(entity: inout Any, callback: OfflineAwareCallback) {
+        persistenceServiceUtilsLocal.removeEventually(entity: &entity, callback: callback)
+    }
+    
+    // *************************************************
     
     // remove later
+    
+//    public func removeEventually() {
+//        persistenceServiceUtilsLocal.removeEventually()
+//    }
     
     public func findLocal() {
         persistenceServiceUtilsLocal.findLocal(whereClause: "objectId!=NULL", properties: nil, limit: nil, offset: nil, sortBy: nil, groupBy: nil, having: nil, responseHandler: { localObjects in

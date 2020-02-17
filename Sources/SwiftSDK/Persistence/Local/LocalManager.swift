@@ -249,17 +249,23 @@ public class LocalManager {
         }
     }
     
-    func insert(object: [String : Any]) -> Int? {
+    func insert(object: [String : Any], callback: OfflineAwareCallback?) {
         let cmd = prepareInsertCommand(object: object)
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
-            return Int(sqlite3_last_insert_rowid(dbInstance))
+            let blLocalId = Int(sqlite3_last_insert_rowid(dbInstance))
+            if let insertedObject = (select(whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]])?.first {
+                callback?.localResponseHandler?(insertedObject)
+            }
         }
-        //⚠️⚠️⚠️⚠️⚠️ else { let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance)) }
-        return nil
+        else {
+            let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+            let fault = Fault(message: errorMessage)
+            callback?.localErrorHandler?(fault)
+        }
     }
     
-    func update(newValues: [String : Any], whereClause: String) {
+    func update(newValues: [String : Any], whereClause: String, callback: OfflineAwareCallback?) {
         let existingColumns = getColumns()
         var valuesString = ""
         for (key, value) in newValues {
@@ -279,21 +285,41 @@ public class LocalManager {
         let cmd = "UPDATE \(tableName) SET \(valuesString) WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue) AND \(parseWhereClauseWithGrammar(whereClause))"
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
-        }
-    }
-    
-    func removeLocally(whereClause: String) {
-        let cmd = "DELETE FROM \(tableName) WHERE \(parseWhereClauseWithGrammar(whereClause))"
-        var statement: OpaquePointer?
-        if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK {
-            if sqlite3_step(statement) != SQLITE_DONE {
-                // ⚠️⚠️⚠️⚠️⚠️ let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+            let result = select(whereClause: whereClause)
+            if result is [[String : Any]],
+                let updatedObject = (result as! [[String : Any]]).first {
+                callback?.localResponseHandler?(updatedObject)
+            }
+            else if result is Fault {
+                callback?.localErrorHandler?(result as! Fault)
             }
         }
         else {
-            // ⚠️⚠️⚠️⚠️⚠️ let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+            let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+            let fault = Fault(message: errorMessage)
+            callback?.localErrorHandler?(fault)
+        }        
+    }
+    
+    func delete(whereClause: String, callback: OfflineAwareCallback?) {
+        let result = select(whereClause: whereClause)
+        if result is [[String : Any]],
+            let objectToDelete = (result as! [[String : Any]]).first {
+            let cmd = "DELETE FROM \(tableName) WHERE \(parseWhereClauseWithGrammar(whereClause))"
+            var statement: OpaquePointer?
+            if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
+                callback?.localResponseHandler?(objectToDelete)
+            }
+            else {
+                let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+                let fault = Fault(message: errorMessage)
+                callback?.localErrorHandler?(fault)
+            }
+            sqlite3_finalize(statement)            
         }
-        sqlite3_finalize(statement)
+        else if result is Fault {
+            callback?.localErrorHandler?(result as! Fault)
+        }
     }
     
     func select(whereClause: String) -> Any {
