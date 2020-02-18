@@ -21,6 +21,9 @@
 
 @objcMembers public class PersistenceService: NSObject {
     
+    public var dataRetrievalPolicy = RetrievalPolicy.onlineOnly
+    public var localStoragePolicy = LocalStoragePolicy.doNotStoreAny
+    
     public lazy var permissions: DataPermission = {
         let _permissions = DataPermission()
         return _permissions
@@ -46,6 +49,5 @@
             localManager = LocalManager(tableName: tableName)
             localManager.dropTable()
         }
-        //TransactionsManager.shared.removeAllTransactions()
     }
 }

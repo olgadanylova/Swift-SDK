@@ -181,6 +181,42 @@ class PersistenceServiceUtils {
     }
     
     func find(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        var retrievalPolicy = queryBuilder?.dataRetrievalPolicy
+        if retrievalPolicy == nil {
+            retrievalPolicy = Backendless.shared.data.dataRetrievalPolicy
+        }
+        if retrievalPolicy == .onlineOnly {
+            findOnline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .offlineOnly {
+            findOffline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .dynamic {
+            if ConnectionManager.isConnectedToNetwork() {
+                findOnline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+            else {
+                findOffline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+        }
+    }
+    
+    private func findOffline(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        let localManager = LocalManager(tableName: tableName)
+        let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+        if let result = result as? [[String : Any]] {
+            var resultArray = [[String : Any]]()
+            for resultObject in result {
+                resultArray.append(removeLocalFields(resultObject))
+            }
+            responseHandler(resultArray)
+        }
+        else if result is Fault {
+            errorHandler(result as! Fault)
+        }
+    }
+    
+    private func findOnline(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
         var parameters = [String: Any]()
         if let whereClause = queryBuilder?.getWhereClause() {
@@ -226,6 +262,13 @@ class PersistenceServiceUtils {
                             resultArray.append(resultDictionary)
                         }
                     }
+                    var localStoragePolicy = queryBuilder?.localStoragePolicy
+                    if localStoragePolicy == nil {
+                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
+                    }
+                    for resultDictionary in resultArray {
+                        self.saveToLocalStorage(resultDictionary, policy: localStoragePolicy!)
+                    }
                     responseHandler(resultArray)
                 }
             }
@@ -233,6 +276,57 @@ class PersistenceServiceUtils {
     }
     
     func findFirstOrLastOrById(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        var retrievalPolicy = queryBuilder?.dataRetrievalPolicy
+        if retrievalPolicy == nil {
+            retrievalPolicy = Backendless.shared.data.dataRetrievalPolicy
+        }
+        if retrievalPolicy == .onlineOnly {
+            findFirstOrLastOrByIdOnline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .offlineOnly {
+            findFirstOrLastOrByIdOffline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .dynamic {
+            if ConnectionManager.isConnectedToNetwork() {
+                findFirstOrLastOrByIdOnline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+            else {
+                findFirstOrLastOrByIdOffline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+        }
+    }
+    
+    private func findFirstOrLastOrByIdOffline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        let localManager = LocalManager(tableName: tableName)
+        if first || last {
+            let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+            if let resultArray = result as? [[String : Any]] {
+                let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
+                if first, let firstObject = sortedArrayAsc.first {
+                    responseHandler(removeLocalFields(firstObject))
+                }
+                else if last, let lastObject = sortedArrayAsc.last {
+                    responseHandler(removeLocalFields(lastObject))
+                }
+            }
+            else if result is Fault {
+                errorHandler(result as! Fault)
+            }
+        }
+        else if objectId != nil {
+            let whereClause = "objectId='\(objectId!)'"
+            let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+            if result is [[String : Any]],
+                let resultObject = (result as! [[String : Any]]).first {
+                responseHandler(removeLocalFields(resultObject))
+            }
+            else if result is Fault {
+                errorHandler(result as! Fault)
+            }
+        }
+    }
+    
+    private func findFirstOrLastOrByIdOnline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         var restMethod = "data/\(tableName)"
         if first {
             restMethod += "/first"
@@ -274,7 +368,7 @@ class PersistenceServiceUtils {
             else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
                 restMethod += "?relationsDepth=" + String(relationsDepth!)
             }
-        }  
+        }
         BackendlessRequestManager(restMethod: restMethod, httpMethod: .get, headers: nil, parameters: nil).makeRequest(getResponse: { response in
             if let result = ProcessResponse.shared.adapt(response: response, to: JSON.self) {
                 if result is Fault {
@@ -282,6 +376,11 @@ class PersistenceServiceUtils {
                 }
                 else if var resultDictionary = (result as! JSON).dictionaryObject {
                     resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
+                    var localStoragePolicy = queryBuilder?.localStoragePolicy
+                    if localStoragePolicy == nil {
+                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
+                    }
+                    self.saveToLocalStorage(resultDictionary, policy: localStoragePolicy!)
                     responseHandler(resultDictionary)
                 }
             }
@@ -392,6 +491,36 @@ class PersistenceServiceUtils {
                     }
                 }
             })
+        }
+    }
+    
+    func removeLocalFields(_ dictionary: [String : Any]) -> [String : Any] {
+        var resultDictionary = dictionary
+        resultDictionary["blLocalId"] = nil
+        resultDictionary["blLocalTimestamp"] = nil
+        resultDictionary["blPendingOperation"] = nil
+        return resultDictionary
+    }
+    
+    private func saveToLocalStorage(_ dictionary: [String : Any], policy: LocalStoragePolicy) {
+        if let objectId = dictionary["objectId"] as? String {
+            if policy == .storeAll {
+                let whereClause = "objectId = '\(objectId)'"
+                let localManager = LocalManager(tableName: tableName)
+                if localManager.recordExists(whereClause: whereClause) {
+                    localManager.update(newValues: dictionary, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+                else {
+                    localManager.insert(object: dictionary, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+            }
+            else if policy == .storeUpdated {
+                let whereClause = "objectId = '\(objectId)'"
+                let localManager = LocalManager(tableName: tableName)
+                if localManager.recordExists(whereClause: whereClause) {
+                    localManager.update(newValues: dictionary, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+            }
         }
     }
 }

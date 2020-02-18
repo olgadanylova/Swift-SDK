@@ -21,18 +21,22 @@
 
 class PersistenceServiceUtilsLocal {
     
+    private let connectionManager = ConnectionManager()
+    
     private var localManager: LocalManager
     private var tableName: String = ""
     private var objectToDbReferences = [AnyHashable : Int]()
     private var persistenceServiceUtils: PersistenceServiceUtils
     
-    private let connectionManager = ConnectionManager()
+    // MARK: - Init
     
     init(tableName: String) {
         self.tableName = tableName
         localManager = LocalManager(tableName: tableName)
         persistenceServiceUtils = PersistenceServiceUtils(tableName: self.tableName)
     }
+    
+    // MARK: - Init local database
     
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
         localManager.createTableIfNotExist()
@@ -61,8 +65,6 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
-    
-    
     private func nextPage(queryBuilder: DataQueryBuilder, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtils.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
             for object in foundObjects {
@@ -79,9 +81,10 @@ class PersistenceServiceUtilsLocal {
         })
     }
     
+    // MARK: - Internal functions
+    
     func clearLocalDatabase() {
         localManager.dropTable()
-        //TransactionsManager.shared.removeAllTransactions()
     }
     
     func saveEventually(entity: inout Any, callback: OfflineAwareCallback?) {
@@ -111,24 +114,11 @@ class PersistenceServiceUtilsLocal {
             }
         }
         else {
-             // entity is not Dictionary
+            // entity is not Dictionary
         }
     }
     
-    // ********************************************************************
-    
-    func findLocal(whereClause: String?, properties: [String]?, limit: Int?, offset: Int?, sortBy: [String]?, groupBy: [String]?, having: String?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        let result = localManager.select(properties: properties, whereClause: whereClause, limit: limit, offset: offset, orderBy: sortBy, groupBy: groupBy, having: having)
-        if result is [[String : Any]] {
-            // ⚠️⚠️⚠️⚠️⚠️⚠️ remove unnecessary fields before return
-            responseHandler(result as! [[String : Any]])
-        }
-        else if result is Fault {
-            errorHandler(result as! Fault)
-        }
-    }
-    
-    // **************************************
+    // MARK: - Private functions
     
     private func getObjectReference(object: inout Any) -> UnsafeMutablePointer<Any> {
         withUnsafeMutablePointer(to: &object, { reference in
@@ -146,11 +136,12 @@ class PersistenceServiceUtilsLocal {
                         let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
                         if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
                             localObjects.first != nil {
-                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         }
                         else {
-                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: updated, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: updated, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         }
                         semaphore.signal()
                     }, errorHandler: { fault in
@@ -166,11 +157,12 @@ class PersistenceServiceUtilsLocal {
                         let whereClause = "objectId='\(objectId)'"
                         if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
                             localObjects.first != nil {
-                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         }
                         else {
-                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: updated, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: updated, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         }
                         semaphore.signal()
                     }, errorHandler: { fault in
@@ -191,7 +183,8 @@ class PersistenceServiceUtilsLocal {
                     DispatchQueue.global().async {
                         self.persistenceServiceUtils.update(entity: entityToUpdate, responseHandler: { updated in
                             callback?.remoteResponseHandler?(updated)
-                            self.localManager.update(newValues: updated, whereClause: whereClause, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                             semaphore.signal()
                         }, errorHandler: { fault in
                             callback?.remoteErrorHandler?(fault)
@@ -203,8 +196,8 @@ class PersistenceServiceUtilsLocal {
                     DispatchQueue.global().async {
                         self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
                             callback?.remoteResponseHandler?(created)
-                            callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: created, callback: callback)
+                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                            self.localManager.insert(object: created, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                             semaphore.signal()
                         }, errorHandler: { fault in
                             callback?.remoteErrorHandler?(fault)
@@ -217,8 +210,8 @@ class PersistenceServiceUtilsLocal {
                 DispatchQueue.global().async {
                     self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
                         callback?.remoteResponseHandler?(created)
-                        callback?.localResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                        self.localManager.insert(object: created, callback: callback)
+                        let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                        self.localManager.insert(object: created, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         semaphore.signal()
                     }, errorHandler: { fault in
                         callback?.remoteErrorHandler?(fault)
@@ -232,7 +225,50 @@ class PersistenceServiceUtilsLocal {
     }
     
     private func saveEventuallyWhenOffline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
-        // TODO
+        if let objectId = entityDict["objectId"] as? String {
+            if let blLocalId = objectToDbReferences[entityRef] {
+                let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
+                if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
+                    localObjects.first != nil {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+            }
+            else {
+                let whereClause = "objectId='\(objectId)'"
+                if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
+                    localObjects.first != nil {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+            }
+        }
+        else {
+            if let blLocalId = objectToDbReferences[entityRef] {
+                let whereClause = "blLocalId=\(blLocalId)"
+                if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
+                    localObjects.first != nil {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+            }
+            else {
+                let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+        }
     }
     
     private func removeEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
@@ -241,9 +277,9 @@ class PersistenceServiceUtilsLocal {
             DispatchQueue.global().async {
                 self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
                     callback?.remoteResponseHandler?(removed)
-                    callback?.localResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
                     let whereClause = "objectId='\(objectId)'"
-                    self.localManager.delete(whereClause: whereClause, callback: callback)
+                    let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                    self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                     semaphore.signal()
                 }, errorHandler: { fault in
                     callback?.remoteErrorHandler?(fault)
@@ -259,14 +295,14 @@ class PersistenceServiceUtilsLocal {
                 DispatchQueue.global().async {
                     self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
                         callback?.remoteResponseHandler?(removed)
-                        callback?.localResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                        self.localManager.delete(whereClause: whereClause, callback: callback)
+                        let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                        self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         semaphore.signal()
                     }, errorHandler: { fault in
                         callback?.remoteErrorHandler?(fault)
                         semaphore.signal()
                     })
-                }        
+                }
             }
         }
         semaphore.wait()
@@ -274,7 +310,21 @@ class PersistenceServiceUtilsLocal {
     }
     
     private func removeEventuallyWhenOffline(entityDict: inout [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
-        // TODO
+        if let objectId = entityDict["objectId"] as? String {
+            let result = localManager.select(whereClause: "objectId='\(objectId)'")
+            if let objectToDelete = (result as? [[String : Any]])?.first {
+                let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+                localManager.update(newValues: objectToDelete, whereClause: "objectId='\(objectId)'", blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+            else if result is Fault {
+                callback?.localErrorHandler?(result as! Fault)
+            }
+        }
+        else if let blLocalId = objectToDbReferences[entityRef],
+            localManager.recordExists(whereClause: "blLocalId=\(blLocalId)") {
+            let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
+            localManager.delete(whereClause: "blLocalId=\(blLocalId)", localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+        }
     }
     
     private func wrapSaveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
@@ -282,7 +332,7 @@ class PersistenceServiceUtilsLocal {
             if let response = response as? [String : Any],
                 let localId = response["blLocalId"] as? Int64 {
                 self.objectToDbReferences[entityRef] = Int(localId)
-                localResponseHandler?(response)
+                localResponseHandler?(self.persistenceServiceUtils.removeLocalFields(response))
             }
         }
         return wrappedHandler
@@ -291,106 +341,24 @@ class PersistenceServiceUtilsLocal {
     private func wrapRemoveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
             self.objectToDbReferences[entityRef] = nil
-            localResponseHandler?(response)
+            if let response = response as? [String : Any] {
+                localResponseHandler?(self.persistenceServiceUtils.removeLocalFields(response))
+            }
         }
         return wrappedHandler
     }
+    
+    // ****************************************************
+    
+    // remove later
+    
+    func findLocal(whereClause: String?, properties: [String]?, limit: Int?, offset: Int?, sortBy: [String]?, groupBy: [String]?, having: String?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        let result = localManager.select(properties: properties, whereClause: whereClause, limit: limit, offset: offset, orderBy: sortBy, groupBy: groupBy, having: having)
+        if result is [[String : Any]] {
+            responseHandler(result as! [[String : Any]])
+        }
+        else if result is Fault {
+            errorHandler(result as! Fault)
+        }
+    }
 }
-
-// *********************************************************
-
-/*
- func saveEventually(entity: [String : Any]) {
- if localManager == nil {
- initLocalManager()
- }
- if let objectId = entity["objectId"] as? String {
- localManager?.update(newValues: entity, whereClause: "objectId = '\(objectId)'", needTransaction: true)
- }
- else if let blLocalId = entity["blLocalId"] as? NSNumber {
- localManager?.update(newValues: entity, whereClause: "blLocalId = \(blLocalId)", needTransaction: true)
- }
- else {
- localManager?.insert(object: entity, needTransaction: true)
- }
- }
- 
- func removeEventually(entity: [String : Any]) {
- if localManager == nil {
- initLocalManager()
- }
- localManager?.remove(entity: entity, needTransaction: true)
- }
- 
- func getLocalId(entity: Any) -> NSNumber? {
- if let entity = entity as? [String : Any],
- let localId = entity["blLocalId"] as? NSNumber {
- return localId
- }
- else if let localId = localStoredObjects.getLocalId(forObject: entity as! AnyHashable) {
- return localId
- }
- return nil
- }
- 
- func checkPropertiesForSync(tableName: String, dictionary: [String : Any]) -> [String : Any] {
- var resultDict = dictionary
- if let entity = getEntityForClassName(tableName) {
- let properties = getClassPropertiesWithType(entity: entity)
- for (key, type) in properties {
- if type == "B" {
- // property is Boolean
- if dictionary.keys.contains(key), let val = dictionary[key] as? NSNumber {
- let boolVal = val.boolValue
- resultDict[key] = boolVal
- }
- }
- }
- }
- return resultDict
- }
- 
- func convertToGeometryType(dictionary: [String : Any]) -> [String : Any] {
- var resultDictionary = dictionary
- for (key, value) in dictionary {
- if let dictValue = value as? [String : Any] {
- if dictValue["___class"] as? String == BLPoint.geometryClassName || dictValue["type"] as? String == BLPoint.geoJsonType {
- resultDictionary[key] = try? GeoJSONParser.dictionaryToPoint(dictValue)
- }
- else if dictValue["___class"] as? String == BLLineString.geometryClassName || dictValue["type"] as? String == BLLineString.geoJsonType {
- resultDictionary[key] = try? GeoJSONParser.dictionaryToLineString(dictValue)
- }
- else if dictValue["___class"] as? String == BLPolygon.geometryClassName || dictValue["type"] as? String == BLPolygon.geoJsonType {
- resultDictionary[key] = try? GeoJSONParser.dictionaryToPolygon(dictValue)
- }
- }
- else if let dictValue = value as? String {
- if dictValue.contains(BLPoint.wktType) {
- resultDictionary[key] = try? BLPoint.fromWkt(dictValue)
- }
- else if dictValue.contains(BLLineString.wktType) {
- resultDictionary[key] = try? BLLineString.fromWkt(dictValue)
- }
- else if dictValue.contains(BLPolygon.wktType) {
- resultDictionary[key] = try? BLPolygon.fromWkt(dictValue)
- }
- }
- }
- return resultDictionary
- }
- 
- private func convertFromGeometryType(dictionary: [String : Any]) -> [String : Any] {
- var resultDictionary = dictionary
- for (key, value) in dictionary {
- if let point = value as? BLPoint {
- resultDictionary[key] = point.asGeoJson()
- }
- else if let lineString = value as? BLLineString {
- resultDictionary[key] = lineString.asGeoJson()
- }
- else if let polygon = value as? BLPolygon {
- resultDictionary[key] = polygon.asGeoJson()
- }
- }
- return resultDictionary
- }*/

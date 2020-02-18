@@ -21,6 +21,9 @@
 
 @objcMembers public class DataQueryBuilder: NSObject, Codable {
     
+    public var dataRetrievalPolicy = RetrievalPolicy.onlineOnly
+    public var localStoragePolicy = LocalStoragePolicy.doNotStoreAny
+    
     private var whereClause: String?
     private var relationsDepth: Int = 0
     private var relationsPageSize: Int = 10
