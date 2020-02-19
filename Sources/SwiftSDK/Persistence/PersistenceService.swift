@@ -23,12 +23,12 @@
     
     public var dataRetrievalPolicy = RetrievalPolicy.onlineOnly
     public var localStoragePolicy = LocalStoragePolicy.doNotStoreAny
+    public private(set) var isOfflineAutoSyncEnabled = false
     
     public lazy var permissions: DataPermission = {
         let _permissions = DataPermission()
         return _permissions
     }()
-
 
     public func ofTable(_ tableName: String) -> MapDrivenDataStore {
         return MapDrivenDataStore(tableName: tableName)
@@ -49,5 +49,13 @@
             localManager = LocalManager(tableName: tableName)
             localManager.dropTable()
         }
+    }
+    
+    public func enableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = true
+    }
+    
+    public func disableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = false
     }
 }

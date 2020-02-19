@@ -153,34 +153,19 @@
         persistenceServiceUtilsLocal.clearLocalDatabase()
     }
     
-    public func saveEventually(entity: inout Any) {
-        persistenceServiceUtilsLocal.saveEventually(entity: &entity, callback: nil)
+    public func saveEventually(entity: [String : Any]) {
+        persistenceServiceUtilsLocal.saveEventually(entity: entity, callback: nil)
     }
     
-    public func saveEventually(entity: inout Any, callback: OfflineAwareCallback) {
-        persistenceServiceUtilsLocal.saveEventually(entity: &entity, callback: callback)
+    public func saveEventually(entity: [String : Any], callback: OfflineAwareCallback) {
+        persistenceServiceUtilsLocal.saveEventually(entity: entity, callback: callback)
     }
     
-    public func removeEventually(entity: inout Any) {
-        persistenceServiceUtilsLocal.removeEventually(entity: &entity, callback: nil)
+    public func removeEventually(entity: [String : Any]) {
+        persistenceServiceUtilsLocal.removeEventually(entity: entity, callback: nil)
     }
     
-    public func removeEventually(entity: inout Any, callback: OfflineAwareCallback) {
-        persistenceServiceUtilsLocal.removeEventually(entity: &entity, callback: callback)
-    }
-    
-    // *************************************************
-    
-    // remove later
-    
-    public func findLocal() {
-        persistenceServiceUtilsLocal.findLocal(whereClause: "objectId!=NULL", properties: nil, limit: nil, offset: nil, sortBy: nil, groupBy: nil, having: nil, responseHandler: { localObjects in
-            print("localObjects count = \(localObjects.count):")
-            for local in localObjects {
-                print(local)
-            }
-        }, errorHandler: { fault in
-            print("⚠️ Error: \(fault.message ?? "")")
-        })
+    public func removeEventually(entity: [String : Any], callback: OfflineAwareCallback) {
+        persistenceServiceUtilsLocal.removeEventually(entity: entity, callback: callback)
     }
 }

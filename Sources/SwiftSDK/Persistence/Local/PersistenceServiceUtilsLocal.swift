@@ -21,11 +21,8 @@
 
 class PersistenceServiceUtilsLocal {
     
-    private let connectionManager = ConnectionManager()
-    
     private var localManager: LocalManager
-    private var tableName: String = ""
-    private var objectToDbReferences = [AnyHashable : Int]()
+    private var tableName: String = "" 
     private var persistenceServiceUtils: PersistenceServiceUtils
     
     // MARK: - Init
@@ -87,199 +84,39 @@ class PersistenceServiceUtilsLocal {
         localManager.dropTable()
     }
     
-    func saveEventually(entity: inout Any, callback: OfflineAwareCallback?) {
+    func saveEventually(entity: [String : Any], callback: OfflineAwareCallback?) {
         localManager.createTableIfNotExist()
-        let entityRef = getObjectReference(object: &entity)
-        if let entityDict = entity as? [String : Any] {
-            if ConnectionManager.isConnectedToNetwork() {
-                saveEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef, callback: callback)
-            }
-            else {
-                saveEventuallyWhenOffline(entityDict: entityDict, entityRef: entityRef, callback: callback)
-            }
+        if ConnectionManager.isConnectedToNetwork() {
+            saveEventuallyWhenOnline(entity, callback: callback)
         }
         else {
-            // entity is not Dictionary
+            saveEventuallyWhenOffline(entity, callback: callback)
         }
     }
     
-    func removeEventually(entity: inout Any, callback: OfflineAwareCallback?) {
-        let entityRef = getObjectReference(object: &entity)
-        if var entityDict = entity as? [String : Any] {
-            if ConnectionManager.isConnectedToNetwork() {
-                removeEventuallyWhenOnline(entityDict: entityDict, entityRef: entityRef, callback: callback)
-            }
-            else {
-                removeEventuallyWhenOffline(entityDict: &entityDict, entityRef: entityRef, callback: callback)
-            }
+    func removeEventually(entity: [String : Any], callback: OfflineAwareCallback?) {
+        if ConnectionManager.isConnectedToNetwork() {
+            removeEventuallyWhenOnline(entity, callback: callback)
         }
         else {
-            // entity is not Dictionary
+            removeEventuallyWhenOffline(entity, callback: callback)
         }
     }
     
     // MARK: - Private functions
     
-    private func getObjectReference(object: inout Any) -> UnsafeMutablePointer<Any> {
-        withUnsafeMutablePointer(to: &object, { reference in
-            return reference
-        })
-    }
-    
-    private func saveEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
+    private func saveEventuallyWhenOnline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
         let semaphore = DispatchSemaphore(value: 0)
-        if let objectId = entityDict["objectId"] as? String {
-            if let blLocalId = objectToDbReferences[entityRef] {
-                DispatchQueue.global().async {
-                    self.persistenceServiceUtils.update(entity: entityDict, responseHandler: { updated in
-                        callback?.remoteResponseHandler?(updated)
-                        let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
-                        if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
-                            localObjects.first != nil {
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        }
-                        else {
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: updated, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        }
-                        semaphore.signal()
-                    }, errorHandler: { fault in
-                        callback?.remoteErrorHandler?(fault)
-                        semaphore.signal()
-                    })
-                }
-            }
-            else {
-                DispatchQueue.global().async {
-                    self.persistenceServiceUtils.update(entity: entityDict, responseHandler: { updated in
-                        callback?.remoteResponseHandler?(updated)
-                        let whereClause = "objectId='\(objectId)'"
-                        if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
-                            localObjects.first != nil {
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        }
-                        else {
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: updated, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        }
-                        semaphore.signal()
-                    }, errorHandler: { fault in
-                        callback?.remoteErrorHandler?(fault)
-                        semaphore.signal()
-                    })
-                }
-            }
-        }
-        else {
-            if let blLocalId = objectToDbReferences[entityRef] {
-                let whereClause = "blLocalId=\(blLocalId)"
-                if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
-                    let localObject = localObjects.first,
-                    let objectId = localObject["objectId"] as? String {
-                    var entityToUpdate = entityDict
-                    entityToUpdate["objectId"] = objectId
-                    DispatchQueue.global().async {
-                        self.persistenceServiceUtils.update(entity: entityToUpdate, responseHandler: { updated in
-                            callback?.remoteResponseHandler?(updated)
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.update(newValues: updated, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                            semaphore.signal()
-                        }, errorHandler: { fault in
-                            callback?.remoteErrorHandler?(fault)
-                            semaphore.signal()
-                        })
-                    }
-                }
-                else {
-                    DispatchQueue.global().async {
-                        self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
-                            callback?.remoteResponseHandler?(created)
-                            let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                            self.localManager.insert(object: created, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                            semaphore.signal()
-                        }, errorHandler: { fault in
-                            callback?.remoteErrorHandler?(fault)
-                            semaphore.signal()
-                        })
-                    }
-                }
-            }
-            else {
-                DispatchQueue.global().async {
-                    self.persistenceServiceUtils.create(entity: entityDict, responseHandler: { created in
-                        callback?.remoteResponseHandler?(created)
-                        let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                        self.localManager.insert(object: created, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        semaphore.signal()
-                    }, errorHandler: { fault in
-                        callback?.remoteErrorHandler?(fault)
-                        semaphore.signal()
-                    })
-                }
-            }
-        }
-        semaphore.wait()
-        return
-    }
-    
-    private func saveEventuallyWhenOffline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
-        if let objectId = entityDict["objectId"] as? String {
-            if let blLocalId = objectToDbReferences[entityRef] {
-                let whereClause = "objectId='\(objectId)' AND blLocalId=\(blLocalId)"
-                if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
-                    localObjects.first != nil {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-                else {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-            }
-            else {
-                let whereClause = "objectId='\(objectId)'"
-                if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
-                    localObjects.first != nil {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-                else {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-            }
-        }
-        else {
-            if let blLocalId = objectToDbReferences[entityRef] {
-                let whereClause = "blLocalId=\(blLocalId)"
-                if let localObjects = self.localManager.select(whereClause: whereClause) as? [[String : Any]],
-                    localObjects.first != nil {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.update(newValues: entityDict, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-                else {
-                    let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                }
-            }
-            else {
-                let wrappedResponseHandler = self.wrapSaveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                self.localManager.insert(object: entityDict, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-            }
-        }
-    }
-    
-    private func removeEventuallyWhenOnline(entityDict: [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
-        let semaphore = DispatchSemaphore(value: 0)
-        if let objectId = entityDict["objectId"] as? String {
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler)
+        
+        // create remotely - create locally
+        if objectId == nil, blLocalId == nil {
             DispatchQueue.global().async {
-                self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
-                    callback?.remoteResponseHandler?(removed)
-                    let whereClause = "objectId='\(objectId)'"
-                    let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                    self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                    callback?.remoteResponseHandler?(responseObject)
+                    self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                     semaphore.signal()
                 }, errorHandler: { fault in
                     callback?.remoteErrorHandler?(fault)
@@ -287,78 +124,307 @@ class PersistenceServiceUtilsLocal {
                 })
             }
         }
-        else if let blLocalId = objectToDbReferences[entityRef] {
-            let whereClause = "blLocalId=\(blLocalId)"
-            if let localObjects = localManager.select(whereClause: whereClause) as? [[String : Any]],
-                let objectToDelete = localObjects.first,
-                let objectId = objectToDelete["objectId"] as? String {
-                DispatchQueue.global().async {
-                    self.persistenceServiceUtils.removeById(objectId: objectId, responseHandler: { removed in
-                        callback?.remoteResponseHandler?(removed)
-                        let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                        self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
-                        semaphore.signal()
-                    }, errorHandler: { fault in
-                        callback?.remoteErrorHandler?(fault)
-                        semaphore.signal()
-                    })
+            // if record exists locally and objectId != nil: update remotely - update locally
+            // if record exists locally and objectId == nil: create remotely - update locally
+            // if record doesn't exist locally: create remotely - create locally
+        else if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+                semaphore.signal()
+            }
+            else if let localObjects = localResult as? [[String : Any]] {
+                if let localObject = localObjects.first {
+                    if let objId = localObject["objectId"] as? String {
+                        var objectToUpdate = entity
+                        objectToUpdate["objectId"] = objId
+                        DispatchQueue.global().async {
+                            self.persistenceServiceUtils.update(entity: objectToUpdate, responseHandler: { responseObject in
+                                callback?.remoteResponseHandler?(responseObject)
+                                self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                                semaphore.signal()
+                            }, errorHandler: { fault in
+                                callback?.remoteErrorHandler?(fault)
+                                semaphore.signal()
+                            })
+                        }
+                    }
+                    else {
+                        DispatchQueue.global().async {
+                            self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                                callback?.remoteResponseHandler?(responseObject)
+                                self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                                semaphore.signal()
+                            }, errorHandler: { fault in
+                                callback?.remoteErrorHandler?(fault)
+                                semaphore.signal()
+                            })
+                        }
+                    }
                 }
+                else {
+                    DispatchQueue.global().async {
+                        self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                            callback?.remoteResponseHandler?(responseObject)
+                            self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }, errorHandler: { fault in
+                            callback?.remoteErrorHandler?(fault)
+                            semaphore.signal()
+                        })
+                    }
+                }
+            }
+        }
+            // update remotely
+            // if record exists locally: update locally
+            // if record doesn't exist locally: create locally
+        else if objectId != nil, blLocalId == nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                    callback?.remoteResponseHandler?(responseObject)
+                    let whereClause = "objectId='\(objectId!)'"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if let localObjects = localResult as? [[String : Any]] {
+                        if localObjects.first != nil {
+                            self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }
+                        else {
+                            self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+            // update remotely
+            // if record exists locally: update locally
+            // if record doesn't exist locally: create locally
+        else if objectId != nil, blLocalId != nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                    callback?.remoteResponseHandler?(responseObject)
+                    let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if let localObjects = localResult as? [[String : Any]] {
+                        if localObjects.first != nil {
+                            self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }
+                        else {
+                            // ⚠️ is it correct?
+                            self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
             }
         }
         semaphore.wait()
         return
     }
     
-    private func removeEventuallyWhenOffline(entityDict: inout [String : Any], entityRef: UnsafeMutablePointer<Any>, callback: OfflineAwareCallback?) {
-        if let objectId = entityDict["objectId"] as? String {
-            let result = localManager.select(whereClause: "objectId='\(objectId)'")
-            if let objectToDelete = (result as? [[String : Any]])?.first {
-                let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-                localManager.update(newValues: objectToDelete, whereClause: "objectId='\(objectId)'", blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+    private func saveEventuallyWhenOffline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler)
+        
+        // save locally
+        if objectId == nil, blLocalId == nil {
+            localManager.insert(object: entity, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+        }
+        // if record exists locally: update locally
+        // if record doesn't exist locally: create locally
+        else if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
             }
-            else if result is Fault {
-                callback?.localErrorHandler?(result as! Fault)
+            else if let localObjects = localResult as? [[String : Any]] {
+                if localObjects.first != nil {
+                    self.localManager.update(newValues: entity, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    self.localManager.insert(object: entity, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
             }
         }
-        else if let blLocalId = objectToDbReferences[entityRef],
-            localManager.recordExists(whereClause: "blLocalId=\(blLocalId)") {
-            let wrappedResponseHandler = self.wrapRemoveLocalHandler(callback?.localResponseHandler, entityRef: entityRef)
-            localManager.delete(whereClause: "blLocalId=\(blLocalId)", localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+        // if record exists locally: update locally
+        // if record doesn't exist locally: create locally
+        else if objectId != nil, blLocalId == nil {
+            let whereClause = "objectId='\(objectId!)'"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]] {
+                if localObjects.first != nil {
+                    self.localManager.update(newValues: entity, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    self.localManager.insert(object: entity, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+            }
+        }
+        else if objectId != nil, blLocalId != nil {
+            let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]] {
+                if localObjects.first != nil {
+                    self.localManager.update(newValues: entity, whereClause: whereClause, blPendingOperation: .update, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+                else {
+                    // ⚠️ is it correct?
+                    self.localManager.insert(object: entity, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                }
+            }
         }
     }
     
-    private func wrapSaveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
+    private func removeEventuallyWhenOnline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
+        let semaphore = DispatchSemaphore(value: 0)
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler)
+        
+        // if record exists locally and objectId != nil: remove remotely - remove locally
+        // if record exists locally and objectId == nil: remove locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+                semaphore.signal()
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                let localObject = localObjects.first {
+                if let objId = localObject["objectId"] as? String {
+                    DispatchQueue.global().async {
+                        self.persistenceServiceUtils.removeById(objectId: objId, responseHandler: { response in
+                            callback?.remoteResponseHandler?(response)
+                            self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }, errorHandler: { fault in
+                            callback?.remoteErrorHandler?(fault)
+                            semaphore.signal()
+                        })
+                    }
+                }
+                else {
+                    localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                    semaphore.signal()
+                }
+            }
+        }
+        
+        // remove remotely
+        // if record exists locally: remove locally
+        else if objectId != nil, blLocalId == nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.removeById(objectId: objectId!, responseHandler: { response in
+                    callback?.remoteResponseHandler?(response)
+                    let whereClause = "objectId='\(objectId!)'"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+        else if objectId != nil, blLocalId != nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.removeById(objectId: objectId!, responseHandler: { response in
+                    callback?.remoteResponseHandler?(response)
+                    let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        self.localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+        semaphore.wait()
+        return
+    }
+    
+    private func removeEventuallyWhenOffline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler)
+        
+        // if record exists locally: remove locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            localManager.delete(whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+        }
+        // if record exists locally: update with BlPendingOperation = .delete
+        else if objectId != nil, blLocalId == nil {
+            let whereClause = "objectId='\(objectId!)'"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                localObjects.first != nil {
+                localManager.update(newValues: entity, whereClause: whereClause, blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+        }
+        // if record exists locally: update with BlPendingOperation = .delete
+        else if objectId != nil, blLocalId != nil {
+            let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                localObjects.first != nil {
+                localManager.update(newValues: entity, whereClause: whereClause, blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+        }
+    }
+    
+    private func wrapLocalHandler(_ localResponseHandler: ((Any) -> Void)?) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
-            if let response = response as? [String : Any],
-                let localId = response["blLocalId"] as? Int64 {
-                self.objectToDbReferences[entityRef] = Int(localId)
-                localResponseHandler?(self.persistenceServiceUtils.removeLocalFields(response))
+            if let responseDict = response as? [String : Any] {
+                localResponseHandler?(PersistenceLocalHelper.shared.removeLocalFields(responseDict))
             }
         }
         return wrappedHandler
-    }
-    
-    private func wrapRemoveLocalHandler(_ localResponseHandler: ((Any) -> Void)?, entityRef: UnsafeMutablePointer<Any>) -> ((Any) -> Void) {
-        let wrappedHandler: (Any) -> () = { response in
-            self.objectToDbReferences[entityRef] = nil
-            if let response = response as? [String : Any] {
-                localResponseHandler?(self.persistenceServiceUtils.removeLocalFields(response))
-            }
-        }
-        return wrappedHandler
-    }
-    
-    // ****************************************************
-    
-    // remove later
-    
-    func findLocal(whereClause: String?, properties: [String]?, limit: Int?, offset: Int?, sortBy: [String]?, groupBy: [String]?, having: String?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        let result = localManager.select(properties: properties, whereClause: whereClause, limit: limit, offset: offset, orderBy: sortBy, groupBy: groupBy, having: having)
-        if result is [[String : Any]] {
-            responseHandler(result as! [[String : Any]])
-        }
-        else if result is Fault {
-            errorHandler(result as! Fault)
-        }
     }
 }

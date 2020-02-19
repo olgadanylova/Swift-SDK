@@ -1,13 +1,17 @@
 /*
 Copyright (c) 2014, Ashley Mills
 All rights reserved.
+
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
+
 1. Redistributions of source code must retain the above copyright notice, this
 list of conditions and the following disclaimer.
+
 2. Redistributions in binary form must reproduce the above copyright notice,
 this list of conditions and the following disclaimer in the documentation
 and/or other materials provided with the distribution.
+
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -22,6 +26,7 @@ POSSIBILITY OF SUCH DAMAGE.
 */
 
 import SystemConfiguration
+import Foundation
 
 public enum ReachabilityError: Error {
     case failedToCreateWithAddress(sockaddr, Int32)
@@ -362,23 +367,30 @@ extension SCNetworkReachabilityFlags {
 /**
  `ReachabilityWeakifier` weakly wraps the `Reachability` class
  in order to break retain cycles when interacting with CoreFoundation.
+
  CoreFoundation callbacks expect a pair of retain/release whenever an
  opaque `info` parameter is provided. These callbacks exist to guard
  against memory management race conditions when invoking the callbacks.
+
  #### Race Condition
+
  If we passed `SCNetworkReachabilitySetCallback` a direct reference to our
  `Reachability` class without also providing corresponding retain/release
  callbacks, then a race condition can lead to crashes when:
  - `Reachability` is deallocated on thread X
  - A `SCNetworkReachability` callback(s) is already in flight on thread Y
+
  #### Retain Cycle
+
  If we pass `Reachability` to CoreFoundtion while also providing retain/
  release callbacks, we would create a retain cycle once CoreFoundation
  retains our `Reachability` class. This fixes the crashes and his how
  CoreFoundation expects the API to be used, but doesn't play nicely with
  Swift/ARC. This cycle would only be broken after manually calling
  `stopNotifier()` — `deinit` would never be called.
+
  #### ReachabilityWeakifier
+
  By providing both retain/release callbacks and wrapping `Reachability` in
  a weak wrapper, we:
  - interact correctly with CoreFoundation, thereby avoiding a crash.

@@ -269,19 +269,19 @@
         
     }
     
-    public func saveEventually(entity: inout Any) {
+    public func saveEventually(entity: Any) {
         
     }
     
-    public func saveEventually(entity: inout Any, callback: OfflineAwareCallback) {
+    public func saveEventually(entity: Any, callback: OfflineAwareCallback) {
         
     }
     
-    public func removeEventually(entity: inout Any) {
+    public func removeEventually(entity: Any) {
         
     }
     
-    public func removeEventually(entity: inout Any, callback: OfflineAwareCallback) {
+    public func removeEventually(entity: Any, callback: OfflineAwareCallback) {
         
     }
 }

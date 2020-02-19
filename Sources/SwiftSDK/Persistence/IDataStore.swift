@@ -56,8 +56,8 @@ protocol IDataStore {
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
     func clearLocalDatabase()
     
-    func saveEventually(entity: inout Any)
-    func saveEventually(entity: inout Any, callback: OfflineAwareCallback)
-    func removeEventually(entity: inout Any)
-    func removeEventually(entity: inout Any, callback: OfflineAwareCallback)
+    func saveEventually(entity: CustomType)
+    func saveEventually(entity: CustomType, callback: OfflineAwareCallback)
+    func removeEventually(entity: CustomType)
+    func removeEventually(entity: CustomType, callback: OfflineAwareCallback)
 }

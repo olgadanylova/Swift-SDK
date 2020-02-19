@@ -28,9 +28,12 @@
     private var applicationId = "AppId"
     private var apiKey = "APIKey"
     
+    private var connectionManager: ConnectionManager?
     private var headers = [String : String]()
     
-    private override init() { }
+    private override init() {
+        connectionManager = ConnectionManager()
+    }
     
     public func initApp(applicationId: String, apiKey: String) {
         self.applicationId = applicationId

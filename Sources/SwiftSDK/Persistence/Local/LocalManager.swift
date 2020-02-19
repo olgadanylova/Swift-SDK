@@ -240,9 +240,7 @@ class LocalManager {
                     if columnName == "blLocalId" || columnName == "blPendingOperation" ||
                         columnName == "created" || columnName == "updated" || columnName == "blLocalTimestamp" {
                         let intValue = sqlite3_column_int64(statement, Int32(i))
-                        if intValue > 0 {
-                            object[columnName] = intValue
-                        }
+                        object[columnName] = intValue
                     }
                     else if columnName == "objectId" || columnName == "ownerId" {
                         if let stringValue = sqlite3_column_text(statement, Int32(i)) {

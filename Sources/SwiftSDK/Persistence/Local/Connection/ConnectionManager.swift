@@ -54,12 +54,24 @@ class ConnectionManager {
         return (isReachable && !needsConnection)
     }
     
+    func observeReachability(){
+        self.reachability = try? Reachability()
+        NotificationCenter.default.addObserver(self, selector:#selector(self.checkForReachability(notification:)), name: NSNotification.Name.reachabilityChanged, object: nil)
+        do {
+            try self.reachability?.startNotifier()
+        }
+        catch(let error) {
+            print("Error occured while starting reachability notifications : \(error.localizedDescription)")
+        }
+    }
+    
     private func configure() {
         NotificationCenter.default.addObserver(self,
-                                               selector: #selector(ConnectionManager.checkForReachability(notification:)),
+                                               selector: #selector(self.checkForReachability(notification:)),
                                                name: Notification.Name.reachabilityChanged,
                                                object: nil)
         try? reachability?.startNotifier()
+        
     }
     
     @objc private func checkForReachability(notification: NSNotification) {
@@ -67,11 +79,13 @@ class ConnectionManager {
         if let remoteHostStatus = networkReachability?.connection {
             switch remoteHostStatus {
             case .none, .unavailable:
-                // save data only to local storage
                 print("")
             case .wifi, .cellular:
-                // sync data with remote storage
-                print("")
+                print("🟢")
+                // if offlineSync enabled
+                // check what tables to sync
+                // select all where pendingOp != .none
+                // process
             }
         }
     }

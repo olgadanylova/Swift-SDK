@@ -277,6 +277,7 @@
 		5E99C2FB23F2BB39000AF689 /* WhereClauseGrammarLexer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E99C25423F2BB39000AF689 /* WhereClauseGrammarLexer.swift */; };
 		5E99C2FC23F2BB39000AF689 /* WhereClauseGrammarVisitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E99C25523F2BB39000AF689 /* WhereClauseGrammarVisitor.swift */; };
 		5E99C2FD23F2BB39000AF689 /* GrammarVisitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E99C25623F2BB39000AF689 /* GrammarVisitor.swift */; };
+		5E9C399D23FD37E7004BC9BB /* LocalIdentifiable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9C399C23FD37E7004BC9BB /* LocalIdentifiable.swift */; };
 		5E9C573221AEEA0400877870 /* SwiftSDK.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E9C572821AEEA0400877870 /* SwiftSDK.framework */; };
 		5E9C573921AEEA0400877870 /* SwiftSDK.h in Headers */ = {isa = PBXBuildFile; fileRef = 5E9C572B21AEEA0400877870 /* SwiftSDK.h */; settings = {ATTRIBUTES = (Public, ); }; };
 		5E9DFC0E2387FABF0019E750 /* SpatialReferenceSystemEnum.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E9DFC0D2387FABF0019E750 /* SpatialReferenceSystemEnum.swift */; };
@@ -310,6 +311,7 @@
 		5EE2B40721C25EC600F90723 /* BackendlessUserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE2B40621C25EC600F90723 /* BackendlessUserTests.swift */; };
 		5EE335AB2396679300A245B1 /* BLPolygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE335AA2396679300A245B1 /* BLPolygon.swift */; };
 		5EE6920121B67791002E72A9 /* FaultTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE6920021B67791002E72A9 /* FaultTests.swift */; };
+		5EF6139323FD3ADD00588E56 /* PersistenceLocalHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EF6139223FD3ADD00588E56 /* PersistenceLocalHelper.swift */; };
 		5EFB60E922422F93004DFA2C /* UserInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFB60E822422F93004DFA2C /* UserInfo.swift */; };
 		5EFBA8FE21C1011E007B3BB0 /* BackendlessUser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EFBA8FD21C1011E007B3BB0 /* BackendlessUser.swift */; };
 		6452098867FA50BF746CA158 /* Pods_SwiftSDKTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 25C5DAA07253AE8AD64C55E4 /* Pods_SwiftSDKTests.framework */; };
@@ -595,6 +597,7 @@
 		5E99C25423F2BB39000AF689 /* WhereClauseGrammarLexer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhereClauseGrammarLexer.swift; sourceTree = "<group>"; };
 		5E99C25523F2BB39000AF689 /* WhereClauseGrammarVisitor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = WhereClauseGrammarVisitor.swift; sourceTree = "<group>"; };
 		5E99C25623F2BB39000AF689 /* GrammarVisitor.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = GrammarVisitor.swift; sourceTree = "<group>"; };
+		5E9C399C23FD37E7004BC9BB /* LocalIdentifiable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalIdentifiable.swift; sourceTree = "<group>"; };
 		5E9C572821AEEA0400877870 /* SwiftSDK.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = SwiftSDK.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		5E9C572B21AEEA0400877870 /* SwiftSDK.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = SwiftSDK.h; sourceTree = "<group>"; };
 		5E9C572C21AEEA0400877870 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -632,6 +635,7 @@
 		5EE2B40621C25EC600F90723 /* BackendlessUserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessUserTests.swift; sourceTree = "<group>"; };
 		5EE335AA2396679300A245B1 /* BLPolygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLPolygon.swift; sourceTree = "<group>"; };
 		5EE6920021B67791002E72A9 /* FaultTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FaultTests.swift; sourceTree = "<group>"; };
+		5EF6139223FD3ADD00588E56 /* PersistenceLocalHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceLocalHelper.swift; sourceTree = "<group>"; };
 		5EFB60E822422F93004DFA2C /* UserInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserInfo.swift; sourceTree = "<group>"; };
 		5EFBA8FD21C1011E007B3BB0 /* BackendlessUser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessUser.swift; sourceTree = "<group>"; };
 		A5BFCA65D60B7561FBB334B2 /* Pods-SwiftSDKTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SwiftSDKTests.release.xcconfig"; path = "Target Support Files/Pods-SwiftSDKTests/Pods-SwiftSDKTests.release.xcconfig"; sourceTree = "<group>"; };
@@ -902,6 +906,8 @@
 				5E78C00523F2B7B1003AE9B0 /* LocalManager.swift */,
 				5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */,
 				5E15471D23FAC8AE00A4A35F /* LocalPolicy.swift */,
+				5E9C399C23FD37E7004BC9BB /* LocalIdentifiable.swift */,
+				5EF6139223FD3ADD00588E56 /* PersistenceLocalHelper.swift */,
 			);
 			path = Local;
 			sourceTree = "<group>";
@@ -1743,6 +1749,7 @@
 				5E64F0BF21C50D8E00590B04 /* BackendlessRequestManager.swift in Sources */,
 				5A2A785321E61D1700EC8007 /* DataStoreFactory.swift in Sources */,
 				5E90721121B66E9E00619C0D /* Fault.swift in Sources */,
+				5EF6139323FD3ADD00588E56 /* PersistenceLocalHelper.swift in Sources */,
 				5E99C28B23F2BB39000AF689 /* DFASerializer.swift in Sources */,
 				5E45F669225F52C5001DD7CF /* GeoMath.swift in Sources */,
 				5E99C28423F2BB39000AF689 /* InterpreterRuleContext.swift in Sources */,
@@ -1849,6 +1856,7 @@
 				5E99C26423F2BB39000AF689 /* IntervalSet.swift in Sources */,
 				5E99C28D23F2BB39000AF689 /* DFAState.swift in Sources */,
 				5E384C9B226F45B300743125 /* IAtomic.swift in Sources */,
+				5E9C399D23FD37E7004BC9BB /* LocalIdentifiable.swift in Sources */,
 				5E8A2A22226EF7DA007C2BAA /* CacheService.swift in Sources */,
 				5E99C29F23F2BB39000AF689 /* NoViableAltException.swift in Sources */,
 				5E99C2CE23F2BB39000AF689 /* LexerActionExecutor.swift in Sources */,

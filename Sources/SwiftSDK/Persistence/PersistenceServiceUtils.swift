@@ -207,8 +207,8 @@ class PersistenceServiceUtils {
         if let result = result as? [[String : Any]] {
             var resultArray = [[String : Any]]()
             for resultObject in result {
-                resultArray.append(removeLocalFields(resultObject))
-            }
+                resultArray.append(PersistenceLocalHelper.shared.removeLocalFields(resultObject))
+            }            
             responseHandler(resultArray)
         }
         else if result is Fault {
@@ -303,10 +303,10 @@ class PersistenceServiceUtils {
             if let resultArray = result as? [[String : Any]] {
                 let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
                 if first, let firstObject = sortedArrayAsc.first {
-                    responseHandler(removeLocalFields(firstObject))
+                    responseHandler(PersistenceLocalHelper.shared.removeLocalFields(firstObject))
                 }
                 else if last, let lastObject = sortedArrayAsc.last {
-                    responseHandler(removeLocalFields(lastObject))
+                    responseHandler(PersistenceLocalHelper.shared.removeLocalFields(lastObject))
                 }
             }
             else if result is Fault {
@@ -318,7 +318,7 @@ class PersistenceServiceUtils {
             let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if result is [[String : Any]],
                 let resultObject = (result as! [[String : Any]]).first {
-                responseHandler(removeLocalFields(resultObject))
+                responseHandler(PersistenceLocalHelper.shared.removeLocalFields(resultObject))
             }
             else if result is Fault {
                 errorHandler(result as! Fault)
@@ -492,14 +492,6 @@ class PersistenceServiceUtils {
                 }
             })
         }
-    }
-    
-    func removeLocalFields(_ dictionary: [String : Any]) -> [String : Any] {
-        var resultDictionary = dictionary
-        resultDictionary["blLocalId"] = nil
-        resultDictionary["blLocalTimestamp"] = nil
-        resultDictionary["blPendingOperation"] = nil
-        return resultDictionary
     }
     
     private func saveToLocalStorage(_ dictionary: [String : Any], policy: LocalStoragePolicy) {
