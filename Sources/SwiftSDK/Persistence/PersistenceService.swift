@@ -57,5 +57,6 @@
     
     public func disableOfflineAutoSync() {
         self.isOfflineAutoSyncEnabled = false
+        OfflineSyncManager.shared.removeAllSyncOperations()
     }
 }

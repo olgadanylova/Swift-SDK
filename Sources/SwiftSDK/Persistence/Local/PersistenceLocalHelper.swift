@@ -25,8 +25,16 @@ class PersistenceLocalHelper {
     
     private init() { }
     
-    func removeLocalFields(_ dictionary: [String : Any]) -> [String : Any] {
+    func removeLocalTimestampAndPendingOpFields(_ dictionary: [String : Any]) -> [String : Any] {
         var resultDictionary = dictionary
+        resultDictionary["blLocalTimestamp"] = nil
+        resultDictionary["blPendingOperation"] = nil
+        return resultDictionary
+    }
+    
+    func removeAllLocalFields(_ dictionary: [String : Any]) -> [String : Any] {
+        var resultDictionary = dictionary
+        resultDictionary["blLocalId"] = nil
         resultDictionary["blLocalTimestamp"] = nil
         resultDictionary["blPendingOperation"] = nil
         return resultDictionary

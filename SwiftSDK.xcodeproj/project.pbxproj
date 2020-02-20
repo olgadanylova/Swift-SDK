@@ -97,7 +97,7 @@
 		5E8A2A22226EF7DA007C2BAA /* CacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A21226EF7DA007C2BAA /* CacheService.swift */; };
 		5E8A2A24226EFA16007C2BAA /* NoReply.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A23226EFA16007C2BAA /* NoReply.swift */; };
 		5E8A2A27226F2BF4007C2BAA /* CacheTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8A2A26226F2BF4007C2BAA /* CacheTests.swift */; };
-		5E8F81E523FA7B6600567626 /* OfflineAwareCallback.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */; };
+		5E8F81E523FA7B6600567626 /* OfflineCallbacks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E8F81E423FA7B6600567626 /* OfflineCallbacks.swift */; };
 		5E90721121B66E9E00619C0D /* Fault.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E90721021B66E9E00619C0D /* Fault.swift */; };
 		5E922249225B8CCF0001688F /* GeoQueryRectangle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E922248225B8CCF0001688F /* GeoQueryRectangle.swift */; };
 		5E92224B225BAA8C0001688F /* GeoCluster.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E92224A225BAA8C0001688F /* GeoCluster.swift */; };
@@ -307,6 +307,8 @@
 		5ECFEFBB23D9C88F004A5DD0 /* BackendlessDataCollection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ECFEFBA23D9C88F004A5DD0 /* BackendlessDataCollection.swift */; };
 		5ED51D0D22456E8600D22F11 /* BackendlessPushHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED51D0C22456E8600D22F11 /* BackendlessPushHelper.swift */; };
 		5ED765D02224369E009431CD /* BulkEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED765CF2224369E009431CD /* BulkEvent.swift */; };
+		5ED8A22C23FE6E0100E4F754 /* OfflineSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED8A22B23FE6E0100E4F754 /* OfflineSyncManager.swift */; };
+		5ED8A25223FE8CEB00E4F754 /* SyncOperation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5ED8A25123FE8CEB00E4F754 /* SyncOperation.swift */; };
 		5EE063BF22017EAA00B862EA /* LoadRelationsQueryBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE063BE22017EAA00B862EA /* LoadRelationsQueryBuilder.swift */; };
 		5EE2B40721C25EC600F90723 /* BackendlessUserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE2B40621C25EC600F90723 /* BackendlessUserTests.swift */; };
 		5EE335AB2396679300A245B1 /* BLPolygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5EE335AA2396679300A245B1 /* BLPolygon.swift */; };
@@ -416,7 +418,7 @@
 		5E8A2A21226EF7DA007C2BAA /* CacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheService.swift; sourceTree = "<group>"; };
 		5E8A2A23226EFA16007C2BAA /* NoReply.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoReply.swift; sourceTree = "<group>"; };
 		5E8A2A26226F2BF4007C2BAA /* CacheTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheTests.swift; sourceTree = "<group>"; };
-		5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineAwareCallback.swift; sourceTree = "<group>"; };
+		5E8F81E423FA7B6600567626 /* OfflineCallbacks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineCallbacks.swift; sourceTree = "<group>"; };
 		5E90721021B66E9E00619C0D /* Fault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fault.swift; sourceTree = "<group>"; };
 		5E922248225B8CCF0001688F /* GeoQueryRectangle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoQueryRectangle.swift; sourceTree = "<group>"; };
 		5E92224A225BAA8C0001688F /* GeoCluster.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GeoCluster.swift; sourceTree = "<group>"; };
@@ -631,6 +633,8 @@
 		5ECFEFBA23D9C88F004A5DD0 /* BackendlessDataCollection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessDataCollection.swift; sourceTree = "<group>"; };
 		5ED51D0C22456E8600D22F11 /* BackendlessPushHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessPushHelper.swift; sourceTree = "<group>"; };
 		5ED765CF2224369E009431CD /* BulkEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BulkEvent.swift; sourceTree = "<group>"; };
+		5ED8A22B23FE6E0100E4F754 /* OfflineSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineSyncManager.swift; sourceTree = "<group>"; };
+		5ED8A25123FE8CEB00E4F754 /* SyncOperation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncOperation.swift; sourceTree = "<group>"; };
 		5EE063BE22017EAA00B862EA /* LoadRelationsQueryBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoadRelationsQueryBuilder.swift; sourceTree = "<group>"; };
 		5EE2B40621C25EC600F90723 /* BackendlessUserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessUserTests.swift; sourceTree = "<group>"; };
 		5EE335AA2396679300A245B1 /* BLPolygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BLPolygon.swift; sourceTree = "<group>"; };
@@ -904,10 +908,12 @@
 				5E99C1A523F2BB38000AF689 /* Grammar */,
 				5E78C00223F2B6C7003AE9B0 /* PersistenceServiceUtilsLocal.swift */,
 				5E78C00523F2B7B1003AE9B0 /* LocalManager.swift */,
-				5E8F81E423FA7B6600567626 /* OfflineAwareCallback.swift */,
+				5E8F81E423FA7B6600567626 /* OfflineCallbacks.swift */,
 				5E15471D23FAC8AE00A4A35F /* LocalPolicy.swift */,
 				5E9C399C23FD37E7004BC9BB /* LocalIdentifiable.swift */,
 				5EF6139223FD3ADD00588E56 /* PersistenceLocalHelper.swift */,
+				5ED8A22B23FE6E0100E4F754 /* OfflineSyncManager.swift */,
+				5ED8A25123FE8CEB00E4F754 /* SyncOperation.swift */,
 			);
 			path = Local;
 			sourceTree = "<group>";
@@ -1612,6 +1618,7 @@
 				5EAA20B823995B1D00A39A38 /* GeometryTestClass.swift in Sources */,
 				5E99C2F923F2BB39000AF689 /* WhereClauseGrammarListener.swift in Sources */,
 				5E99C25D23F2BB39000AF689 /* StringExtension.swift in Sources */,
+				5ED8A22C23FE6E0100E4F754 /* OfflineSyncManager.swift in Sources */,
 				5E99C2A323F2BB39000AF689 /* ConsoleErrorListener.swift in Sources */,
 				5E99C28523F2BB39000AF689 /* BailErrorStrategy.swift in Sources */,
 				5EA31F25225608B1008DF081 /* GeoCategory.swift in Sources */,
@@ -1655,7 +1662,7 @@
 				5E99C27E23F2BB39000AF689 /* Trees.swift in Sources */,
 				5E99C2C423F2BB39000AF689 /* LexerAction.swift in Sources */,
 				5ECAB231238C41A60051F315 /* BLGeometry.swift in Sources */,
-				5E8F81E523FA7B6600567626 /* OfflineAwareCallback.swift in Sources */,
+				5E8F81E523FA7B6600567626 /* OfflineCallbacks.swift in Sources */,
 				5E99C2CD23F2BB39000AF689 /* ATNDeserializer.swift in Sources */,
 				5E99C2A123F2BB39000AF689 /* IntStream.swift in Sources */,
 				5E8A2A24226EFA16007C2BAA /* NoReply.swift in Sources */,
@@ -1683,6 +1690,7 @@
 				5E03A3BA222916A2005A538D /* Channel.swift in Sources */,
 				5E99C2B823F2BB39000AF689 /* DecisionInfo.swift in Sources */,
 				5E97190E221C276600857603 /* IEventHandler.swift in Sources */,
+				5ED8A25223FE8CEB00E4F754 /* SyncOperation.swift in Sources */,
 				5E99C26C23F2BB39000AF689 /* TerminalNode.swift in Sources */,
 				5E84E87C22315E12008B3F05 /* EmailBodyparts.swift in Sources */,
 				5E9DFC0E2387FABF0019E750 /* SpatialReferenceSystemEnum.swift in Sources */,

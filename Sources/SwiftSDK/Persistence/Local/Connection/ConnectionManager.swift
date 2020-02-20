@@ -54,38 +54,35 @@ class ConnectionManager {
         return (isReachable && !needsConnection)
     }
     
-    func observeReachability(){
-        self.reachability = try? Reachability()
-        NotificationCenter.default.addObserver(self, selector:#selector(self.checkForReachability(notification:)), name: NSNotification.Name.reachabilityChanged, object: nil)
-        do {
-            try self.reachability?.startNotifier()
-        }
-        catch(let error) {
-            print("Error occured while starting reachability notifications : \(error.localizedDescription)")
-        }
-    }
-    
     private func configure() {
         NotificationCenter.default.addObserver(self,
-                                               selector: #selector(self.checkForReachability(notification:)),
+                                               selector: #selector(self.checkForReachability(_:)),
                                                name: Notification.Name.reachabilityChanged,
                                                object: nil)
         try? reachability?.startNotifier()
-        
     }
     
-    @objc private func checkForReachability(notification: NSNotification) {
+    @objc private func checkForReachability(_ notification: NSNotification) {
         let networkReachability = notification.object as? Reachability
         if let remoteHostStatus = networkReachability?.connection {
-            switch remoteHostStatus {
-            case .none, .unavailable:
-                print("")
-            case .wifi, .cellular:
-                print("🟢")
-                // if offlineSync enabled
-                // check what tables to sync
-                // select all where pendingOp != .none
-                // process
+            if remoteHostStatus == .wifi || remoteHostStatus == .cellular {
+                print("🟢 Internet connection available")
+                
+                if Backendless.shared.data.isOfflineAutoSyncEnabled {
+                    if !OfflineSyncManager.shared.getSyncOperations().isEmpty {
+                        OfflineSyncManager.shared.processSyncOperations()
+                    }
+                    else {
+                        OfflineSyncManager.shared.processSyncOperationsFromUsersDefaults()
+                    }
+                }
+                
+                // TODO:
+                // если backendless.data.isOfflineAutoSyncEnabled = false:
+                // нужен список таблиц, для которых offlineAutoSyncEnabled = true
+                // пройти по всем офлайн-транзакциям по таблицам из списка
+                // для каждой таблицы из списка отсортировать транзакции по blLocalTimestamp ASC
+                // по одной отправлять на сервер, и удалять из списка транзакций
             }
         }
     }

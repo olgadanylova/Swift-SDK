@@ -1,5 +1,5 @@
 //
-//  OfflineAwareCallback.swift
+//  SyncOperation.swift
 //
 /*
  * *********************************************************************************************************************
@@ -19,17 +19,15 @@
  *  ********************************************************************************************************************
  */
 
-@objcMembers public class OfflineAwareCallback: NSObject {
+class SyncOperation {
     
-    public var localResponseHandler: ((Any) -> Void)?
-    public var localErrorHandler: ((Fault) -> Void)?
-    public var remoteResponseHandler: ((Any) -> Void)?
-    public var remoteErrorHandler: ((Fault) -> Void)?
+    var tableName: String?
+    var operation: [String : Any]?
+    var callback: OfflineAwareCallback?
     
-    public init(localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?, remoteResponseHandler: ((Any) -> Void)?, remoteErrorHandler: ((Fault) -> Void)?) {
-        self.localResponseHandler = localResponseHandler
-        self.localErrorHandler = localErrorHandler
-        self.remoteResponseHandler = remoteResponseHandler
-        self.remoteErrorHandler = remoteErrorHandler
+    init(tableName: String, operation: [String : Any], callback: OfflineAwareCallback?) {
+        self.tableName = tableName
+        self.operation = operation
+        self.callback = callback
     }
 }

@@ -348,8 +348,6 @@ class LocalManager {
         else {
             blLocalTimestamp = DataTypesUtils.shared.dateToInt(date: Date())
         }
-        //let blLocalTimestamp = dataTypesUtils.dateToInt(date: Date())
-        //let blPendingOperation = BlPendingOperation.create.rawValue
         var cmd = "INSERT INTO \(tableName) (blLocalTimestamp, blPendingOperation, objectId, ownerId, created, updated"
         for key in object.keys {
             if key != "blLocalTimestamp", key != "blLocalTimestamp", key != "objectId", key != "ownerId", key != "created", key != "updated", key != "___class", !(object[key] is NSNull) {

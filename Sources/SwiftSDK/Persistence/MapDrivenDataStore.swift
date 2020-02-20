@@ -153,6 +153,14 @@
         persistenceServiceUtilsLocal.clearLocalDatabase()
     }
     
+    public func onSave(_ onSaveCallback: OnSave) {
+        OfflineSyncManager.shared.onSaveCallbacks[tableName] = onSaveCallback
+    }
+    
+    public func onRemove(_ onRemoveCallback: OnRemove) {
+        OfflineSyncManager.shared.onRemoveCallbacks[tableName] = onRemoveCallback
+    }
+    
     public func saveEventually(entity: [String : Any]) {
         persistenceServiceUtilsLocal.saveEventually(entity: entity, callback: nil)
     }

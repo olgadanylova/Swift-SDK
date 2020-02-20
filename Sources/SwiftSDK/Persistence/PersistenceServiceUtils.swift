@@ -207,7 +207,7 @@ class PersistenceServiceUtils {
         if let result = result as? [[String : Any]] {
             var resultArray = [[String : Any]]()
             for resultObject in result {
-                resultArray.append(PersistenceLocalHelper.shared.removeLocalFields(resultObject))
+                resultArray.append(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(resultObject))
             }            
             responseHandler(resultArray)
         }
@@ -303,10 +303,10 @@ class PersistenceServiceUtils {
             if let resultArray = result as? [[String : Any]] {
                 let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
                 if first, let firstObject = sortedArrayAsc.first {
-                    responseHandler(PersistenceLocalHelper.shared.removeLocalFields(firstObject))
+                    responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(firstObject))
                 }
                 else if last, let lastObject = sortedArrayAsc.last {
-                    responseHandler(PersistenceLocalHelper.shared.removeLocalFields(lastObject))
+                    responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(lastObject))
                 }
             }
             else if result is Fault {
@@ -318,7 +318,7 @@ class PersistenceServiceUtils {
             let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if result is [[String : Any]],
                 let resultObject = (result as! [[String : Any]]).first {
-                responseHandler(PersistenceLocalHelper.shared.removeLocalFields(resultObject))
+                responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(resultObject))
             }
             else if result is Fault {
                 errorHandler(result as! Fault)

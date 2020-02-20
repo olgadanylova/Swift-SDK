@@ -269,6 +269,14 @@
         
     }
     
+    public func onSave(_ onSaveCallback: OnSave) {
+        
+    }
+    
+    public func onRemove(_ onSaveCallback: OnRemove) {
+        
+    }
+    
     public func saveEventually(entity: Any) {
         
     }
