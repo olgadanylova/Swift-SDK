@@ -24,6 +24,7 @@
     typealias CustomType = Any
     
     public var rt: EventHandlerForClass!
+    public private(set) var isOfflineAutoSyncEnabled = false
     
     private var entityClass: AnyClass
     private var tableName: String
@@ -266,6 +267,14 @@
     }
     
     public func clearLocalDatabase() {
+        
+    }
+    
+    public func enableOfflineSync() {
+        
+    }
+    
+    public func disableOfflineSync() {
         
     }
     

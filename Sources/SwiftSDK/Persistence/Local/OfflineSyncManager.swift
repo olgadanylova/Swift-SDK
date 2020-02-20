@@ -23,13 +23,13 @@ class OfflineSyncManager {
     
     static let shared = OfflineSyncManager()
     
+    var autoSyncTables = [String]()
     var onSaveCallbacks = [String : OnSave]()
     var onRemoveCallbacks = [String : OnRemove]()
     
     private let syncOperationsKey = "offlineSyncOperations"
-
-    private var syncOperations = [SyncOperation]()
-    private var autoSyncTables = [String]()
+    
+    private var syncOperations = [SyncOperation]()    
     
     // MARK: - Init
     
@@ -77,61 +77,21 @@ class OfflineSyncManager {
     
     // MARK: - Internal functions: process sync operations
     
-    func processSyncOperations() {
-        var deleteIndexes = [Int]()
-        for i in 0..<syncOperations.count {
-            let syncOperation = syncOperations[i]
-            if let tableName = syncOperation.tableName,
-                let operationDesc = syncOperation.operation,
-                let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
-                var callback = syncOperation.callback
-                let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
-                if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
-                    blPendingOperation.intValue == BlPendingOperation.update.rawValue {
-                    if callback == nil {
-                        let onSaveCallback = onSaveCallbacks[tableName]
-                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
-                    }
-                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
-                }
-                else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
-                    if callback == nil {
-                        let onRemoveCallback = onRemoveCallbacks[tableName]
-                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
-                    }
-                    psuLocal.removeEventually(entity: operationDesc, callback: callback)
-                }
-            }
-            deleteIndexes.append(i)
+    func processAllSyncOperations() {
+        if !self.syncOperations.isEmpty {
+            processSyncOperations()
         }
-        deleteIndexes.sort(by: { $1 < $0 })
-        for i in deleteIndexes {
-            removeSyncOperationAtIndex(i)
+        else {
+            processSyncOperationsFromUsersDefaults()
         }
     }
     
-    func processSyncOperationsFromUsersDefaults() {
-        if let syncOps = getSyncOperationsFromUserDefaults() {
-            for (tableName, operationsArray) in syncOps {
-                // operationsArray = operationsArray.sorted(by: { ($0["blLocalTimestamp"] as? Int ?? 0) < ($1["blLocalTimestamp"] as? Int ?? 0) })
-                for operationDesc in operationsArray {
-                    if let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
-                        let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
-                        if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
-                            blPendingOperation.intValue == BlPendingOperation.update.rawValue {
-                            let onSaveCallback = onSaveCallbacks[tableName]
-                            let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
-                            psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
-                        }
-                        else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
-                            let onRemoveCallback = onRemoveCallbacks[tableName]
-                            let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
-                            psuLocal.removeEventually(entity: operationDesc, callback: callback)
-                        }
-                    }
-                }
-                removeSyncOperations(tableName: tableName)
-            }
+    func processSyncOperationsForAutoSyncTables() {
+        if !self.syncOperations.isEmpty {
+            processSyncOperationsForSyncTables()
+        }
+        else {
+            processSyncOperationsFromUsersDefaultsForSyncTables()
         }
     }
     
@@ -163,5 +123,124 @@ class OfflineSyncManager {
         let userDefaults = UserDefaults.standard
         userDefaults.setValue(data, forKey: syncOperationsKey)
         userDefaults.synchronize()
+    }
+    
+    private func processSyncOperations() {
+        var deleteIndexes = [Int]()
+        for i in 0..<syncOperations.count {
+            let syncOperation = syncOperations[i]
+            if let tableName = syncOperation.tableName,
+                let operationDesc = syncOperation.operation,
+                let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
+                var callback = syncOperation.callback
+                let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
+                if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
+                    blPendingOperation.intValue == BlPendingOperation.update.rawValue {
+                    if callback == nil {
+                        let onSaveCallback = onSaveCallbacks[tableName]
+                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                    }
+                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                }
+                else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
+                    if callback == nil {
+                        let onRemoveCallback = onRemoveCallbacks[tableName]
+                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
+                    }
+                    psuLocal.removeEventually(entity: operationDesc, callback: callback)
+                }
+                deleteIndexes.append(i)
+            }
+        }
+        deleteIndexes.sort(by: { $1 < $0 })
+        for i in deleteIndexes {
+            removeSyncOperationAtIndex(i)
+        }
+    }
+    
+    private func processSyncOperationsForSyncTables() {
+        var deleteIndexes = [Int]()
+        for i in 0..<syncOperations.count {
+            let syncOperation = syncOperations[i]
+            if let tableName = syncOperation.tableName,
+                autoSyncTables.contains(tableName),
+                let operationDesc = syncOperation.operation,
+                let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
+                var callback = syncOperation.callback
+                let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
+                if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
+                    blPendingOperation.intValue == BlPendingOperation.update.rawValue {
+                    if callback == nil {
+                        let onSaveCallback = onSaveCallbacks[tableName]
+                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                    }
+                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                }
+                else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
+                    if callback == nil {
+                        let onRemoveCallback = onRemoveCallbacks[tableName]
+                        callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
+                    }
+                    psuLocal.removeEventually(entity: operationDesc, callback: callback)
+                }
+                deleteIndexes.append(i)
+            }
+        }
+        deleteIndexes.sort(by: { $1 < $0 })
+        for i in deleteIndexes {
+            removeSyncOperationAtIndex(i)
+        }
+    }
+    
+    private func processSyncOperationsFromUsersDefaults() {
+        if let syncOps = getSyncOperationsFromUserDefaults() {
+            for (tableName, operationsArray) in syncOps {
+                // operationsArray = operationsArray.sorted(by: { ($0["blLocalTimestamp"] as? Int ?? 0) < ($1["blLocalTimestamp"] as? Int ?? 0) })
+                for operationDesc in operationsArray {
+                    if let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
+                        let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
+                        if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
+                            blPendingOperation.intValue == BlPendingOperation.update.rawValue {
+                            let onSaveCallback = onSaveCallbacks[tableName]
+                            let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                            psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                        }
+                        else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
+                            let onRemoveCallback = onRemoveCallbacks[tableName]
+                            let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
+                            psuLocal.removeEventually(entity: operationDesc, callback: callback)
+                        }
+                    }
+                }
+                removeSyncOperations(tableName: tableName)
+            }
+        }
+    }
+    
+    private func processSyncOperationsFromUsersDefaultsForSyncTables() {
+        if let syncOps = getSyncOperationsFromUserDefaults() {
+            for (tableName, operationsArray) in syncOps {
+                if autoSyncTables.contains(tableName) {
+                    // operationsArray = operationsArray.sorted(by: { ($0["blLocalTimestamp"] as? Int ?? 0) < ($1["blLocalTimestamp"] as? Int ?? 0) })
+                    for operationDesc in operationsArray {
+                        if let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
+                            let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
+                            if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
+                                blPendingOperation.intValue == BlPendingOperation.update.rawValue {
+                                let onSaveCallback = onSaveCallbacks[tableName]
+                                let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                                psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                            }
+                            else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
+                                let onRemoveCallback = onRemoveCallbacks[tableName]
+                                let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
+                                psuLocal.removeEventually(entity: operationDesc, callback: callback)
+                            }
+                        }
+                    }
+                    removeSyncOperations(tableName: tableName)
+                }
+            }
+        }
     }
 }

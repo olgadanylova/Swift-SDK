@@ -24,6 +24,7 @@
     typealias CustomType = [String : Any]
     
     public var rt: EventHandlerForMap!
+    public private(set) var isOfflineAutoSyncEnabled = false
     
     private var tableName: String
     private var persistenceServiceUtils: PersistenceServiceUtils
@@ -151,6 +152,17 @@
     
     public func clearLocalDatabase() {
         persistenceServiceUtilsLocal.clearLocalDatabase()
+    }
+    
+    public func enableOfflineSync() {
+        isOfflineAutoSyncEnabled = true
+        OfflineSyncManager.shared.autoSyncTables.append(self.tableName)
+    }
+    
+    public func disableOfflineSync() {
+        isOfflineAutoSyncEnabled = false
+        OfflineSyncManager.shared.autoSyncTables.removeObject(self.tableName)
+        OfflineSyncManager.shared.removeSyncOperations(tableName: self.tableName)
     }
     
     public func onSave(_ onSaveCallback: OnSave) {

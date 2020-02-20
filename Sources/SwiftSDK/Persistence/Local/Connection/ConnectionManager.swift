@@ -66,23 +66,15 @@ class ConnectionManager {
         let networkReachability = notification.object as? Reachability
         if let remoteHostStatus = networkReachability?.connection {
             if remoteHostStatus == .wifi || remoteHostStatus == .cellular {
+                
                 print("🟢 Internet connection available")
                 
                 if Backendless.shared.data.isOfflineAutoSyncEnabled {
-                    if !OfflineSyncManager.shared.getSyncOperations().isEmpty {
-                        OfflineSyncManager.shared.processSyncOperations()
-                    }
-                    else {
-                        OfflineSyncManager.shared.processSyncOperationsFromUsersDefaults()
-                    }
+                    OfflineSyncManager.shared.processAllSyncOperations()
                 }
-                
-                // TODO:
-                // если backendless.data.isOfflineAutoSyncEnabled = false:
-                // нужен список таблиц, для которых offlineAutoSyncEnabled = true
-                // пройти по всем офлайн-транзакциям по таблицам из списка
-                // для каждой таблицы из списка отсортировать транзакции по blLocalTimestamp ASC
-                // по одной отправлять на сервер, и удалять из списка транзакций
+                else {
+                    OfflineSyncManager.shared.processSyncOperationsForAutoSyncTables()
+                }
             }
         }
     }
