@@ -55,3 +55,12 @@
         self.errorHandler = errorHandler
     }
 }
+
+@objcMembers public class SyncCompletionCallback: NSObject {
+    
+    public var syncCompleted: (([String : SyncStatusReport]) -> Void)?
+    
+    public init(syncCompleted: (([String : SyncStatusReport]) -> Void)?) {
+        self.syncCompleted = syncCompleted
+    }
+}

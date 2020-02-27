@@ -93,7 +93,7 @@
     }
     
     public func findFirst(responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        persistenceServiceUtils.findFirstOrLastOrById(first: true, last: false, objectId: nil, queryBuilder: nil, responseHandler: responseHandler, errorHandler: errorHandler)
+        findFirst(queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func findFirst(queryBuilder: DataQueryBuilder, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -101,7 +101,7 @@
     }
     
     public func findLast(responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        persistenceServiceUtils.findFirstOrLastOrById(first: false, last: true, objectId: nil, queryBuilder: nil, responseHandler: responseHandler, errorHandler: errorHandler)
+        findLast(queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func findLast(queryBuilder: DataQueryBuilder, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -109,7 +109,7 @@
     }
     
     public func findById(objectId: String, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        persistenceServiceUtils.findFirstOrLastOrById(first: false, last: false, objectId: objectId, queryBuilder: nil, responseHandler: responseHandler, errorHandler: errorHandler)
+        findById(objectId: objectId, queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func findById(objectId: String, queryBuilder: DataQueryBuilder, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -140,7 +140,7 @@
         persistenceServiceUtils.deleteRelation(columnName: columnName, parentObjectId: parentObjectId, whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
-    public func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+    public func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
@@ -157,12 +157,13 @@
     public func enableOfflineSync() {
         isOfflineAutoSyncEnabled = true
         OfflineSyncManager.shared.autoSyncTables.append(self.tableName)
+        OfflineSyncManager.shared.dontSyncTables.removeObject(self.tableName)
     }
     
     public func disableOfflineSync() {
         isOfflineAutoSyncEnabled = false
         OfflineSyncManager.shared.autoSyncTables.removeObject(self.tableName)
-        OfflineSyncManager.shared.removeSyncOperations(tableName: self.tableName)
+        OfflineSyncManager.shared.dontSyncTables.append(self.tableName)
     }
     
     public func onSave(_ onSaveCallback: OnSave) {

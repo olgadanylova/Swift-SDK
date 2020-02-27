@@ -65,10 +65,7 @@ class ConnectionManager {
     @objc private func checkForReachability(_ notification: NSNotification) {
         let networkReachability = notification.object as? Reachability
         if let remoteHostStatus = networkReachability?.connection {
-            if remoteHostStatus == .wifi || remoteHostStatus == .cellular {
-                
-                print("🟢 Internet connection available")
-                
+            if remoteHostStatus == .wifi || remoteHostStatus == .cellular {                
                 if Backendless.shared.data.isOfflineAutoSyncEnabled {
                     OfflineSyncManager.shared.processAllSyncOperations()
                 }

@@ -1,5 +1,15 @@
 # RELEASE HISTORY
 
+### xxx / xx, 2020
+* the `properties` of DataQueryBuilder and LoadRelationsQueryBuilder fixed to return all values when user set only one property as empty string
+
+### 5.7.6 / February 25, 2020
+* fixed class to table mapping issue
+* fixed type casting for Backendless types
+
+### 5.7.5 / February 20, 2020
+* fixed issue when parsing Geometry types for Flutter-SDK
+
 ### 5.7.4 / February 14, 2020
 * code refactored
 * added the PersistenceHelper class

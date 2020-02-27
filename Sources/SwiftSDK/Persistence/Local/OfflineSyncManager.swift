@@ -24,11 +24,11 @@ class OfflineSyncManager {
     static let shared = OfflineSyncManager()
     
     var autoSyncTables = [String]()
+    var dontSyncTables = [String]()
     var onSaveCallbacks = [String : OnSave]()
     var onRemoveCallbacks = [String : OnRemove]()
     
-    private let syncOperationsKey = "offlineSyncOperations"
-    
+    private let syncOperationsKey = "offlineSyncOperations"    
     private var syncOperations = [SyncOperation]()    
     
     // MARK: - Init
@@ -75,7 +75,7 @@ class OfflineSyncManager {
         saveSyncOperationsToUserDefaults(syncOperations)
     }
     
-    // MARK: - Internal functions: process sync operations
+    // MARK: - Internal functions: process sync operations automatically
     
     func processAllSyncOperations() {
         if !self.syncOperations.isEmpty {
@@ -94,6 +94,133 @@ class OfflineSyncManager {
             processSyncOperationsFromUsersDefaultsForSyncTables()
         }
     }
+    
+    // ***************************************************************************************************************
+    
+    // MARK: - Internal functions: process sync operations semi-automatically
+    
+    func processAllSyncOperations(_ callback: SyncCompletionCallback?) {
+        // TODO
+        if !self.syncOperations.isEmpty {
+            //processSyncOperations()
+        }
+        else {
+            //processSyncOperationsFromUsersDefaults()
+        }
+    }
+    
+    func processSyncOperationsForAutoSyncTables(_ callback: SyncCompletionCallback) {
+        // TODO
+        if !self.syncOperations.isEmpty {
+            processSyncOperations(callback)
+        }
+        else {
+            //processSyncOperationsFromUsersDefaultsForSyncTables()
+        }
+    }
+    
+    private func processSyncOperations(_ callback: SyncCompletionCallback) {
+        var createSuccess = [String : [Any]]()
+        var updateSuccess = [String : [Any]]()
+        var deleteSuccess = [String : [Any]]()
+        
+        var createErrors = [String : [SyncError]]()
+        var updateErrors = [String : [SyncError]]()
+        var deleteErrors = [String : [SyncError]]()
+        
+        var deleteIndexes = [Int]()
+        for i in 0..<syncOperations.count {
+            let syncOperation = syncOperations[i]
+            if let tableName = syncOperation.tableName, !dontSyncTables.contains(tableName),
+                let operationDesc = syncOperation.operation,
+                let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
+                let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)
+                
+                if blPendingOperation.intValue == BlPendingOperation.create.rawValue ||
+                    blPendingOperation.intValue == BlPendingOperation.update.rawValue {
+                    let syncObject = psuLocal.saveEventuallWhenOnlineSemiAutoSync(PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc))
+                    if let syncedObject = syncObject.syncObject {
+                        let syncOperation = syncObject.syncOperation
+                        if syncOperation == .create {
+                            var objects = createSuccess[tableName]
+                            if objects == nil {
+                                objects = [Any]()
+                            }
+                            objects?.append(syncedObject)
+                            createSuccess[tableName] = objects
+                        }
+                        else if syncOperation == .update {
+                            var objects = updateSuccess[tableName]
+                            if objects == nil {
+                                objects = [Any]()
+                            }
+                            objects?.append(syncedObject)
+                            updateSuccess[tableName] = objects
+                        }
+                    }
+                    else if let syncError = syncObject.syncError {
+                        let syncOperation = syncObject.syncOperation
+                        if syncOperation == .create {
+                            var errors = createErrors[tableName]
+                            if errors == nil {
+                                errors = [SyncError]()
+                            }
+                            errors?.append(syncError)
+                            createErrors[tableName] = errors
+                        }
+                        else if syncOperation == .update {
+                            var errors = updateErrors[tableName]
+                            if errors == nil {
+                                errors = [SyncError]()
+                            }
+                            errors?.append(syncError)
+                            updateErrors[tableName] = errors
+                        }
+                    }
+                }
+                else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
+                    let syncObject = psuLocal.removeEventuallWhenOnlineSemiAutoSync(PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc))
+                    if syncObject.syncOperation == .delete {
+                        if let syncedObject = syncObject.syncObject {
+                            var objects = deleteSuccess[tableName]
+                            if objects == nil {
+                                objects = [Any]()
+                            }
+                            objects?.append(syncedObject)
+                            deleteSuccess[tableName] = objects
+                        }
+                        else if let syncError = syncObject.syncError {
+                            var errors = deleteErrors[tableName]
+                            if errors == nil {
+                                errors = [SyncError]()
+                            }
+                            errors?.append(syncError)
+                            deleteErrors[tableName] = errors
+                        }
+                    }
+                    deleteIndexes.append(i)
+                }
+            }
+        }
+        
+        // create callback
+        // syncCompleted: (([String : SyncStatusReport]) -> Void)?
+        
+        var responseDictionary = [String : SyncStatusReport]()
+        
+        for (tableName, createdArray) in createSuccess {
+            let syncStatusReport = SyncStatusReport()
+            
+        }
+        
+        
+        deleteIndexes.sort(by: { $1 < $0 })
+        for i in deleteIndexes {
+            removeSyncOperationAtIndex(i)
+        }
+    }
+    
+    // ***************************************************************************************************************
     
     // MARK: - Private functions
     
@@ -129,7 +256,7 @@ class OfflineSyncManager {
         var deleteIndexes = [Int]()
         for i in 0..<syncOperations.count {
             let syncOperation = syncOperations[i]
-            if let tableName = syncOperation.tableName,
+            if let tableName = syncOperation.tableName, !dontSyncTables.contains(tableName),
                 let operationDesc = syncOperation.operation,
                 let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
                 var callback = syncOperation.callback

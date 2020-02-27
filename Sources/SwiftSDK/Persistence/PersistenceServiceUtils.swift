@@ -55,9 +55,9 @@ class PersistenceServiceUtils {
                 if result is Fault {
                     errorHandler(result as! Fault)
                 }
-                else if var resultDictionary = (result as! JSON).dictionaryObject {
-                    resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
-                    responseHandler(resultDictionary)
+                else if let resultDictionary = (result as! JSON).dictionaryObject,
+                    let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                    responseHandler(responseDictionary)
                 }
             }
         })
@@ -99,9 +99,9 @@ class PersistenceServiceUtils {
                             updatedUser.setUserToken(value: currentToken)
                             Backendless.shared.userService.setPersistentUser(currentUser: updatedUser)
                         }
-                        else if var resultDictionary = (result as! JSON).dictionaryObject {
-                            resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
-                            responseHandler(resultDictionary)
+                        else if let resultDictionary = (result as! JSON).dictionaryObject,
+                            let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                            responseHandler(responseDictionary)
                         }
                     }
                 }
@@ -229,7 +229,15 @@ class PersistenceServiceUtils {
             parameters["relationsPageSize"] = relationsPageSize
         }
         if let properties = queryBuilder?.getProperties() {
-            parameters["props"] = properties
+            var props = [String]()
+            for property in properties {
+                if !property.isEmpty {
+                    props.append(property)
+                }
+            }
+            if !props.isEmpty {
+                parameters["props"] = props
+            }
         }
         if let sortBy = queryBuilder?.getSortBy(), sortBy.count > 0 {
             parameters["sortBy"] = DataTypesUtils.shared.arrayToString(array: sortBy)
@@ -257,9 +265,9 @@ class PersistenceServiceUtils {
                 else {
                     var resultArray = [[String: Any]]()
                     for resultObject in result as! [JSON] {
-                        if var resultDictionary = resultObject.dictionaryObject {
-                            resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
-                            resultArray.append(resultDictionary)
+                        if let resultDictionary = resultObject.dictionaryObject,
+                            let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                            resultArray.append(responseDictionary)
                         }
                     }
                     var localStoragePolicy = queryBuilder?.localStoragePolicy
@@ -326,7 +334,7 @@ class PersistenceServiceUtils {
         }
     }
     
-    private func findFirstOrLastOrByIdOnline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+    func findFirstOrLastOrByIdOnline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         var restMethod = "data/\(tableName)"
         if first {
             restMethod += "/first"
@@ -344,29 +352,40 @@ class PersistenceServiceUtils {
         
         if relationsPageSize != nil {
             restMethod += "?relationsPageSize=\(relationsPageSize!)"
-            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth! > 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth == 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth! > 0 {
                 restMethod += "&relationsDepth=" + String(relationsDepth!)
             }
         }
         else {
-            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth! > 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth == 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth! > 0 {
                 restMethod += "?relationsDepth=" + String(relationsDepth!)
+            }
+        }
+        if let properties = queryBuilder?.getProperties() {
+            var props = [String]()
+            for property in properties {
+                if !property.isEmpty {
+                    props.append(property)
+                }
+            }
+            if !props.isEmpty {
+                restMethod += "&props=" + DataTypesUtils.shared.arrayToString(array: props)
             }
         }
         BackendlessRequestManager(restMethod: restMethod, httpMethod: .get, headers: nil, parameters: nil).makeRequest(getResponse: { response in
@@ -374,14 +393,9 @@ class PersistenceServiceUtils {
                 if result is Fault {
                     errorHandler(result as! Fault)
                 }
-                else if var resultDictionary = (result as! JSON).dictionaryObject {
-                    resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
-                    var localStoragePolicy = queryBuilder?.localStoragePolicy
-                    if localStoragePolicy == nil {
-                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
-                    }
-                    self.saveToLocalStorage(resultDictionary, policy: localStoragePolicy!)
-                    responseHandler(resultDictionary)
+                else if let resultDictionary = (result as! JSON).dictionaryObject,
+                    let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                    responseHandler(responseDictionary)
                 }
             }
         })
@@ -458,7 +472,7 @@ class PersistenceServiceUtils {
         })
     }
     
-    func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+    func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
         var parameters = [String: Any]()
         parameters["pageSize"] = queryBuilder.getPageSize()
@@ -466,8 +480,16 @@ class PersistenceServiceUtils {
         if let sortBy = queryBuilder.getSortBy(), sortBy.count > 0 {
             parameters["sortBy"] = DataTypesUtils.shared.arrayToString(array: sortBy)
         }
-        if let props = queryBuilder.getProperties() {
-            parameters["props"] = DataTypesUtils.shared.arrayToString(array: props)
+        if let properties = queryBuilder.getProperties() {
+            var props = [String]()
+            for property in properties {
+                if !property.isEmpty {
+                    props.append(property)
+                }
+            }
+            if !props.isEmpty {
+                parameters["props"] = DataTypesUtils.shared.arrayToString(array: props)
+            }
         }
         if queryBuilder.getRelationName().isEmpty {
             let fault = Fault(message: "Incorrect relationName property")
@@ -480,11 +502,10 @@ class PersistenceServiceUtils {
                         errorHandler(result as! Fault)
                     }
                     else {
-                        var resultArray = [[String: Any]]()
+                        var resultArray = [Any]()
                         for resultObject in result as! [JSON] {
-                            if var resultDictionary = resultObject.dictionaryObject {
-                                resultDictionary = PersistenceHelper.shared.convertDictionaryValuesToBLType(resultDictionary)
-                                resultArray.append(resultDictionary)
+                            if let resultDictionary = resultObject.dictionaryObject {
+                                resultArray.append(PersistenceHelper.shared.convertToBLType(resultDictionary))
                             }
                         }
                         responseHandler(resultArray)

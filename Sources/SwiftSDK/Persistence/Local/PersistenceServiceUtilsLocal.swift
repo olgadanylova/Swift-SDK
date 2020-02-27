@@ -94,6 +94,146 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
+    func saveEventuallWhenOnlineSemiAutoSync(_ entity: [String : Any]) -> SyncObject {
+        let semaphore = DispatchSemaphore(value: 0)
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        var syncOperation = SyncOperationType.create
+        var syncObject: Any?
+        var syncError: SyncError?
+        
+        // if record exists locally and objectId != nil: update remotely - update locally
+        // if record exists locally and objectId == nil: create remotely - update locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                syncOperation = .update
+                syncError = SyncError(object: syncObject, error: fault.message)
+                semaphore.signal()
+            }
+            else if let localObjects = localResult as? [[String : Any]] {
+                if let localObject = localObjects.first {
+                    if let objId = localObject["objectId"] as? String {
+                        var objectToUpdate = entity
+                        objectToUpdate["objectId"] = objId
+                        DispatchQueue.global().async {
+                            self.persistenceServiceUtils.update(entity: objectToUpdate, responseHandler: { responseObject in
+                                self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponseObject in
+                                    syncOperation = .update
+                                    syncObject = localResponseObject
+                                    semaphore.signal()
+                                }, localErrorHandler: { fault in
+                                    syncOperation = .update
+                                    syncError = SyncError(object: entity, error: fault.message)
+                                    semaphore.signal()
+                                })
+                            }, errorHandler: { fault in
+                                syncError = SyncError(object: entity, error: fault.message)
+                                syncOperation = .update
+                                semaphore.signal()
+                            })
+                        }
+                    }
+                    else {
+                        DispatchQueue.global().async {
+                            self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                                self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponseObject in
+                                    syncOperation = .create
+                                    syncObject = localResponseObject
+                                    semaphore.signal()
+                                }, localErrorHandler: { fault in
+                                    syncOperation = .create
+                                    syncError = SyncError(object: entity, error: fault.message)
+                                    semaphore.signal()
+                                })
+                            }, errorHandler: { fault in
+                                syncOperation = .update
+                                syncError = SyncError(object: entity, error: fault.message)
+                                semaphore.signal()
+                            })
+                        }
+                    }
+                }
+                else {
+                    // object doesn't exist locally
+                    semaphore.signal()
+                }
+            }
+        }
+            // update remotely
+            // if record exists locally: update locally
+        else if objectId != nil, blLocalId == nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                    let whereClause = "objectId='\(objectId!)'"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        syncOperation = .update
+                        syncError = SyncError(object: entity, error: fault.message)
+                        semaphore.signal()
+                    }
+                    else if let localObjects = localResult as? [[String : Any]], localObjects.first != nil {
+                        self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponseObject in
+                            syncOperation = .update
+                            syncObject = localResponseObject
+                            semaphore.signal()
+                        }, localErrorHandler: { fault in
+                            syncOperation = .update
+                            syncError = SyncError(object: entity, error: fault.message)
+                            semaphore.signal()
+                        })
+                    }
+                    else {
+                        // object doesn't exist locally
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    syncOperation = .update
+                    syncError = SyncError(object: entity, error: fault.message)
+                    semaphore.signal()
+                })
+            }
+        }
+            // ⚠️ update remotely
+            // ⚠️ if record exists locally: update locally
+        else if objectId != nil, blLocalId != nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                    let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        syncOperation = .update
+                        syncError = SyncError(object: entity, error: fault.message)
+                        semaphore.signal()
+                    }
+                    else if let localObjects = localResult as? [[String : Any]],
+                        localObjects.first != nil {
+                        self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponseObject in
+                            syncOperation = .update
+                            syncObject = localResponseObject
+                            semaphore.signal()
+                        }, localErrorHandler: { fault in
+                            syncOperation = .update
+                            syncError = SyncError(object: entity, error: fault.message)
+                            semaphore.signal()
+                        })
+                    }
+                    else {
+                        // object doesn't exist locally
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    syncOperation = .update
+                    syncError = SyncError(object: entity, error: fault.message)
+                    semaphore.signal()
+                })
+            }
+        }
+        semaphore.wait()
+        return SyncObject(syncOperation: syncOperation, syncObject: syncObject, syncError: syncError)
+    }
+    
     func removeEventually(entity: [String : Any], callback: OfflineAwareCallback?) {
         if ConnectionManager.isConnectedToNetwork() {
             removeEventuallyWhenOnline(entity, callback: callback)
@@ -101,6 +241,100 @@ class PersistenceServiceUtilsLocal {
         else {
             removeEventuallyWhenOffline(entity, callback: callback)
         }
+    }
+    
+    func removeEventuallWhenOnlineSemiAutoSync(_ entity: [String : Any]) -> SyncObject {
+        let semaphore = DispatchSemaphore(value: 0)
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        var syncObject: Any?
+        var syncError: SyncError?
+        
+        // if record exists locally and objectId != nil: remove remotely - remove locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = localManager.select(whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                syncError = SyncError(object: entity, error: fault.message)
+                semaphore.signal()
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                let localObject = localObjects.first {
+                if let objId = localObject["objectId"] as? String {
+                    DispatchQueue.global().async {
+                        self.persistenceServiceUtils.removeById(objectId: objId, responseHandler: { response in
+                            self.localManager.delete(whereClause: whereClause, localResponseHandler: { localResponseObject in
+                                syncObject = localResponseObject
+                                semaphore.signal()
+                            }, localErrorHandler: { fault in
+                                syncError = SyncError(object: entity, error: fault.message)
+                                semaphore.signal()
+                            })
+                        }, errorHandler: { fault in
+                            syncError = SyncError(object: entity, error: fault.message)
+                            semaphore.signal()
+                        })
+                    }
+                }
+                else {
+                    // object doesn't exist locally
+                    semaphore.signal()
+                }
+            }
+        }
+            
+            // remove remotely
+            // if record exists locally: remove locally
+        else if objectId != nil, blLocalId == nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.removeById(objectId: objectId!, responseHandler: { response in
+                    let whereClause = "objectId='\(objectId!)'"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        syncError = SyncError(object: entity, error: fault.message)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        self.localManager.delete(whereClause: whereClause, localResponseHandler: { localResponseObject in
+                            syncObject = localResponseObject
+                            semaphore.signal()
+                        }, localErrorHandler: { fault in
+                            syncError = SyncError(object: entity, error: fault.message)
+                            semaphore.signal()
+                        })
+                    }
+                }, errorHandler: { fault in
+                    syncError = SyncError(object: entity, error: fault.message)
+                    semaphore.signal()
+                })
+            }
+        }
+        else if objectId != nil, blLocalId != nil {
+            DispatchQueue.global().async {
+                self.persistenceServiceUtils.removeById(objectId: objectId!, responseHandler: { response in
+                    let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+                    let localResult = self.localManager.select(whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        syncError = SyncError(object: entity, error: fault.message)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        self.localManager.delete(whereClause: whereClause, localResponseHandler: { localResponseObject in
+                            syncObject = localResponseObject
+                            semaphore.signal()
+                        }, localErrorHandler: { fault in
+                            syncError = SyncError(object: entity, error: fault.message)
+                            semaphore.signal()
+                        })
+                    }
+                }, errorHandler: { fault in
+                    syncError = SyncError(object: entity, error: fault.message)
+                    semaphore.signal()
+                })
+            }
+        }
+        semaphore.wait()
+        return SyncObject(syncOperation: .delete, syncObject: syncObject, syncError: syncError)
     }
     
     // MARK: - Private functions
