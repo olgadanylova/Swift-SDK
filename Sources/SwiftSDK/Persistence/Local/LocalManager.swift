@@ -196,6 +196,10 @@ class LocalManager {
         }
     }
     
+    func select() -> Any {
+        return select(properties: nil, whereClause: nil, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
+    }
+    
     func select(whereClause: String) -> Any {
         return select(properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
     }
@@ -206,7 +210,7 @@ class LocalManager {
         if props == nil { props = ["*"] }
         let columnList = DataTypesUtils.shared.arrayToString(array: props!)
         var cmd = "SELECT \(columnList) FROM \(tableName) WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue)"
-        if whereClause != nil {
+        if whereClause != nil, !whereClause!.isEmpty {
             cmd += " AND \(parseWhereClauseWithGrammar(whereClause!))"
         }
         if orderBy != nil {

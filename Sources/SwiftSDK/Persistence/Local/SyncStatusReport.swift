@@ -20,20 +20,40 @@
  */
 
 @objcMembers public class SyncStatusReport: NSObject {
-    public var successfulCompletion = [SyncSuccess]()
-    public var failedCompletion = [SyncFailure]()
+    
+    public var successfulCompletion: SyncSuccess?
+    public var failedCompletion: SyncFailure?
+    
+    public init(successfulCompletion: SyncSuccess?, failedCompletion: SyncFailure?) {
+        self.successfulCompletion = successfulCompletion
+        self.failedCompletion = failedCompletion
+    }
 }
 
 @objcMembers public class SyncSuccess: NSObject {
-    public var created = [Any]()
-    public var updated = [Any]()
-    public var deleted = [Any]()
+    
+    public var created: [Any]?
+    public var updated: [Any]?
+    public var deleted: [Any]?
+    
+    public init(created: [Any]?, updated: [Any]?, deleted: [Any]?) {
+        self.created = created
+        self.updated = updated
+        self.deleted = deleted
+    }
 }
 
 @objcMembers public class SyncFailure: NSObject {
-    public var createErrors = [SyncError]()
-    public var updateErrors = [SyncError]()
-    public var deleteErrors = [SyncError]()
+    
+    public var createErrors: [SyncError]?
+    public var updateErrors: [SyncError]?
+    public var deleteErrors: [SyncError]?
+    
+    public init(createErrors: [SyncError]?, updateErrors: [SyncError]?, deleteErrors: [SyncError]?) {
+        self.createErrors = createErrors
+        self.updateErrors = updateErrors
+        self.deleteErrors = deleteErrors
+    }
 }
 
 @objcMembers public class SyncError: NSObject {

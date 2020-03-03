@@ -250,6 +250,10 @@
         
     }
     
+    public func startOfflineSync(_ callback: SyncCompletionCallback) {
+        
+    }
+    
     public func onSave(_ onSaveCallback: OnSave) {
         
     }

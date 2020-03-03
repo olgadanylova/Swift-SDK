@@ -60,6 +60,6 @@
     }
     
     public func startOfflineSync(_ callback: SyncCompletionCallback) {
-        OfflineSyncManager.shared.processAllSyncOperations(callback)
+        OfflineSyncManager.shared.processAllOperationsSemiAuto(callback)
     }
 }

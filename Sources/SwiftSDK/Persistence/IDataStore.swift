@@ -57,6 +57,7 @@ protocol IDataStore {
     func clearLocalDatabase()
     func enableOfflineSync()
     func disableOfflineSync()
+    func startOfflineSync(_ callback: SyncCompletionCallback)
     func onSave(_ onSaveCallback: OnSave)
     func onRemove(_ onSaveCallback: OnRemove)  
     func saveEventually(entity: CustomType)

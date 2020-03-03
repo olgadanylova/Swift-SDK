@@ -166,6 +166,10 @@
         OfflineSyncManager.shared.dontSyncTables.append(self.tableName)
     }
     
+    public func startOfflineSync(_ callback: SyncCompletionCallback) {
+        OfflineSyncManager.shared.processSyncOperationsForTable(table: self.tableName, callback: callback)
+    }
+    
     public func onSave(_ onSaveCallback: OnSave) {
         OfflineSyncManager.shared.onSaveCallbacks[tableName] = onSaveCallback
     }
