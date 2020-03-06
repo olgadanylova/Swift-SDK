@@ -358,7 +358,6 @@ class OfflineSyncManager {
         var deleteErrors = [String : [SyncError]]()
         
         var deleteIndexes = [Int]()
-        
         for i in 0..<syncOperations.count {            
             let syncOperation = syncOperations[i]
             if table != nil {
@@ -436,11 +435,45 @@ class OfflineSyncManager {
         syncTables = Array(Set(syncTables))
         
         var syncStatusDict = [String : SyncStatusReport]()
-        for tableName in syncTables {
-            let successfulCompletion = SyncSuccess(created: createSuccess[tableName], updated: updateSuccess[tableName], deleted: deleteSuccess[tableName])
-            let failedCompletion = SyncFailure(createErrors: createErrors[tableName], updateErrors: updateErrors[tableName], deleteErrors: deleteErrors[tableName])
+        for tableName in syncTables {            
+            let createSuccessObjects = prepareSuccessObjectsForRepsonse(createSuccess[tableName])
+            let updateSuccessObjects = prepareSuccessObjectsForRepsonse(updateSuccess[tableName])
+            let deleteSuccessObjects = prepareSuccessObjectsForRepsonse(deleteSuccess[tableName])
+            
+            let createErrorsObjects = prepareFailureObjectsForRepsonse(createErrors[tableName])
+            let updateErrorsObjects = prepareFailureObjectsForRepsonse(updateErrors[tableName])
+            let deleteErrorsObjects = prepareFailureObjectsForRepsonse(deleteErrors[tableName])
+            
+            let successfulCompletion = SyncSuccess(created: createSuccessObjects, updated: updateSuccessObjects, deleted: deleteSuccessObjects)
+            let failedCompletion = SyncFailure(createErrors: createErrorsObjects, updateErrors: updateErrorsObjects, deleteErrors: deleteErrorsObjects)
             syncStatusDict[tableName] = SyncStatusReport(successfulCompletion: successfulCompletion, failedCompletion: failedCompletion)
         }
         return syncStatusDict
+    }
+    
+    private func prepareSuccessObjectsForRepsonse(_ successObjects: [Any]?) -> [Any]? {
+        if let successObjects = successObjects as? [[String : Any]], !successObjects.isEmpty {
+            var resultArray = [[String : Any]]()
+            for var object in successObjects {
+                object = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(object)
+                resultArray.append(object)
+            }
+            return resultArray
+        }
+        return nil
+    }
+    
+    private func prepareFailureObjectsForRepsonse(_ failureObjects: [SyncError]?) -> [SyncError]? {
+        if let failureObjects = failureObjects, !failureObjects.isEmpty {
+            var resultArray = [SyncError]()
+            for failureObject in failureObjects {
+                if let object = failureObject.object as? [String : Any] {
+                    let syncError = SyncError(object: PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(object), error: failureObject.error)
+                    resultArray.append(syncError)
+                }
+            }
+            return resultArray
+        }
+        return nil
     }
 }

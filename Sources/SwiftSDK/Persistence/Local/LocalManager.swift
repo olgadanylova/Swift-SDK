@@ -155,7 +155,7 @@ class LocalManager {
                 }
             }
         }
-        valuesString += "blPendingOperation = \(blPendingOperation.rawValue)"        
+        valuesString += "blPendingOperation = \(blPendingOperation.rawValue)" 
         let cmd = "UPDATE \(tableName) SET \(valuesString) WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue) AND \(parseWhereClauseWithGrammar(whereClause))"
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
@@ -332,11 +332,14 @@ class LocalManager {
     
     private func getFieldType(value: Any) -> String {
         var fieldType = "REAL"
-        if (value is NSInteger) {
+        if value is NSInteger {
             fieldType = "INTEGER"
         }
         else if value is String {
             fieldType = "TEXT"
+        }
+        else if value is BLGeometry {
+            fieldType = "STRING"
         }
         return fieldType
     }
@@ -397,6 +400,9 @@ class LocalManager {
                     else {
                         cmd += ", 0"
                     }
+                }
+                else if value is BLGeometry, let wkt = (value as! BLGeometry).asWkt() {
+                    cmd += ", \(wkt)"
                 }
                 else if value is String {
                     cmd += ", '\(value)'"

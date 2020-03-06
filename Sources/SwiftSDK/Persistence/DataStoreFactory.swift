@@ -147,7 +147,13 @@
     }
     
     public func findFirst(responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        findFirst(queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
+        let wrappedBlock: ([String: Any]) -> () = { responseDictionary in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                responseHandler(resultEntity)
+            }
+        }
+        persistenceServiceUtils.findFirstOrLastOrById(first: true, last: false, objectId: nil, queryBuilder: nil, responseHandler: wrappedBlock, errorHandler: errorHandler)
     }
     
     public func findFirst(queryBuilder: DataQueryBuilder, responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -161,7 +167,13 @@
     }
     
     public func findLast(responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        findLast(queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
+        let wrappedBlock: ([String: Any]) -> () = { responseDictionary in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                responseHandler(resultEntity)
+            }
+        }
+        persistenceServiceUtils.findFirstOrLastOrById(first: false, last: true, objectId: nil, queryBuilder: nil, responseHandler: wrappedBlock, errorHandler: errorHandler)
     }
     
     public func findLast(queryBuilder: DataQueryBuilder, responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -175,7 +187,13 @@
     }
     
     public func findById(objectId: String, responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        findById(objectId: objectId, queryBuilder: DataQueryBuilder(), responseHandler: responseHandler, errorHandler: errorHandler)
+        let wrappedBlock: ([String: Any]) -> () = { responseDictionary in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                responseHandler(resultEntity)
+            }
+        }
+        persistenceServiceUtils.findFirstOrLastOrById(first: false, last: false, objectId: objectId, queryBuilder: nil, responseHandler: wrappedBlock, errorHandler: errorHandler)
     }
     
     public func findById(objectId: String, queryBuilder: DataQueryBuilder, responseHandler: ((Any) -> Void)!, errorHandler: ((Fault) -> Void)!) {

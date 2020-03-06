@@ -95,6 +95,7 @@ class PersistenceServiceUtilsLocal {
     }
     
     func saveEventuallySemiAutoSync(_ entity: [String : Any]) -> SyncObject {
+        let entity = PersistenceLocalHelper.shared.prepareGeometryForOffline(entity)
         let semaphore = DispatchSemaphore(value: 0)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
@@ -103,6 +104,7 @@ class PersistenceServiceUtilsLocal {
         var syncError: SyncError?
         let whereClause = generateWhereClause(objectId: objectId, blLocalId: blLocalId)
         let localResult = localManager.select(whereClause: whereClause)
+        
         if let fault = localResult as? Fault {
             syncOperation = .create
             syncError = SyncError(object: syncObject, error: fault.message)
@@ -113,6 +115,7 @@ class PersistenceServiceUtilsLocal {
             if localObject["objectId"] != nil {
                 DispatchQueue.global().async {
                     self.persistenceServiceUtils.update(entity: PersistenceLocalHelper.shared.removeAllLocalFields(localObject), responseHandler: { response in
+                        let response = PersistenceLocalHelper.shared.prepareGeometryForOffline(response)
                         self.localManager.update(newValues: response, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponse in
                             if localResponse is [String : Any] {
                                 syncObject = PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(localResponse as! [String : Any])
@@ -134,6 +137,7 @@ class PersistenceServiceUtilsLocal {
             else {
                 DispatchQueue.global().async {
                     self.persistenceServiceUtils.create(entity: PersistenceLocalHelper.shared.removeAllLocalFields(localObject), responseHandler: { response in
+                        let response = PersistenceLocalHelper.shared.prepareGeometryForOffline(response)
                         self.localManager.update(newValues: response, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: { localResponse in
                             if localResponse is [String : Any] {
                                 syncObject = PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(localResponse as! [String : Any])
@@ -171,6 +175,7 @@ class PersistenceServiceUtilsLocal {
     }
     
     func removeEventuallySemiAutoSync(_ entity: [String : Any]) -> SyncObject {
+        let entity = PersistenceLocalHelper.shared.prepareGeometryForOffline(entity)
         let semaphore = DispatchSemaphore(value: 0)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
@@ -221,13 +226,14 @@ class PersistenceServiceUtilsLocal {
         let semaphore = DispatchSemaphore(value: 0)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
-        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler, callback: callback)
+        let wrappedResponseHandler = self.wrapLocalHandlerWhenOnline(callback?.localResponseHandler, callback: callback)
         
         // create remotely - create locally
         if objectId == nil, blLocalId == nil {
             DispatchQueue.global().async {
-                self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                self.persistenceServiceUtils.create(entity: PersistenceLocalHelper.shared.removeAllLocalFields(entity), responseHandler: { responseObject in
                     callback?.remoteResponseHandler?(responseObject)
+                    let responseObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(responseObject)
                     self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                     semaphore.signal()
                 }, errorHandler: { fault in
@@ -252,8 +258,9 @@ class PersistenceServiceUtilsLocal {
                         var objectToUpdate = entity
                         objectToUpdate["objectId"] = objId
                         DispatchQueue.global().async {
-                            self.persistenceServiceUtils.update(entity: objectToUpdate, responseHandler: { responseObject in
+                            self.persistenceServiceUtils.update(entity: PersistenceLocalHelper.shared.removeAllLocalFields(objectToUpdate), responseHandler: { responseObject in
                                 callback?.remoteResponseHandler?(responseObject)
+                                let responseObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(responseObject)
                                 self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                                 semaphore.signal()
                             }, errorHandler: { fault in
@@ -264,8 +271,9 @@ class PersistenceServiceUtilsLocal {
                     }
                     else {
                         DispatchQueue.global().async {
-                            self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                            self.persistenceServiceUtils.create(entity: PersistenceLocalHelper.shared.removeAllLocalFields(entity), responseHandler: { responseObject in
                                 callback?.remoteResponseHandler?(responseObject)
+                                let responseObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(responseObject)
                                 self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                                 semaphore.signal()
                             }, errorHandler: { fault in
@@ -277,8 +285,9 @@ class PersistenceServiceUtilsLocal {
                 }
                 else {
                     DispatchQueue.global().async {
-                        self.persistenceServiceUtils.create(entity: entity, responseHandler: { responseObject in
+                        self.persistenceServiceUtils.create(entity: PersistenceLocalHelper.shared.removeAllLocalFields(entity), responseHandler: { responseObject in
                             callback?.remoteResponseHandler?(responseObject)
+                            let responseObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(responseObject)
                             self.localManager.insert(object: responseObject, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                             semaphore.signal()
                         }, errorHandler: { fault in
@@ -294,8 +303,9 @@ class PersistenceServiceUtilsLocal {
             // if record doesn't exist locally: create locally
         else if objectId != nil, blLocalId == nil {
             DispatchQueue.global().async {
-                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                self.persistenceServiceUtils.update(entity: PersistenceLocalHelper.shared.removeAllLocalFields(entity), responseHandler: { responseObject in
                     callback?.remoteResponseHandler?(responseObject)
+                    let responseObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(responseObject)
                     let whereClause = "objectId='\(objectId!)'"
                     let localResult = self.localManager.select(whereClause: whereClause)
                     if let fault = localResult as? Fault {
@@ -323,7 +333,7 @@ class PersistenceServiceUtilsLocal {
             // if record doesn't exist locally: create locally
         else if objectId != nil, blLocalId != nil {
             DispatchQueue.global().async {
-                self.persistenceServiceUtils.update(entity: entity, responseHandler: { responseObject in
+                self.persistenceServiceUtils.update(entity: PersistenceLocalHelper.shared.removeAllLocalFields(entity), responseHandler: { responseObject in
                     callback?.remoteResponseHandler?(responseObject)
                     let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
                     let localResult = self.localManager.select(whereClause: whereClause)
@@ -332,8 +342,9 @@ class PersistenceServiceUtilsLocal {
                         semaphore.signal()
                     }
                     else if let localObjects = localResult as? [[String : Any]],
-                        localObjects.first != nil {
-                        self.localManager.update(newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        var localObject = localObjects.first {
+                        localObject = PersistenceLocalHelper.shared.prepareGeometryForOffline(localObject)
+                        self.localManager.update(newValues: localObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         semaphore.signal()
                     }
                 }, errorHandler: { fault in
@@ -347,9 +358,10 @@ class PersistenceServiceUtilsLocal {
     }
     
     private func saveEventuallyWhenOffline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
+        let entity = PersistenceLocalHelper.shared.prepareGeometryForOffline(entity)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
-        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler, callback: callback)
+        let wrappedResponseHandler = self.wrapLocalHandlerWhenOffline(callback?.localResponseHandler, callback: callback)
         
         // save locally
         if objectId == nil, blLocalId == nil {
@@ -406,7 +418,7 @@ class PersistenceServiceUtilsLocal {
         let semaphore = DispatchSemaphore(value: 0)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
-        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler, callback: callback)
+        let wrappedResponseHandler = self.wrapLocalHandlerWhenOnline(callback?.localResponseHandler, callback: callback)
         
         // if record exists locally and objectId != nil: remove remotely - remove locally
         // if record exists locally and objectId == nil: remove locally
@@ -485,9 +497,10 @@ class PersistenceServiceUtilsLocal {
     }
     
     private func removeEventuallyWhenOffline(_ entity: [String : Any], callback: OfflineAwareCallback?) {
+        let entity = PersistenceLocalHelper.shared.prepareGeometryForOffline(entity)
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
-        let wrappedResponseHandler = self.wrapLocalHandler(callback?.localResponseHandler, callback: callback)
+        let wrappedResponseHandler = self.wrapLocalHandlerWhenOffline(callback?.localResponseHandler, callback: callback)
         
         // if record exists locally: remove locally
         if objectId == nil, blLocalId != nil {
@@ -520,14 +533,27 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
-    private func wrapLocalHandler(_ localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
+    private func wrapLocalHandlerWhenOnline(_ localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
             if let responseDict = response as? [String : Any] {
                 if !ConnectionManager.isConnectedToNetwork() {
-                    //OfflineSyncManager.shared.addSyncOperation(tableName: self.tableName, syncOperation: responseDict)
                     let syncOperation = SyncOperation(tableName: self.tableName, operation: responseDict, callback: callback)
                     OfflineSyncManager.shared.addSyncOperation(syncOperation)
                 }
+                localResponseHandler?(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(responseDict))
+            }
+        }
+        return wrappedHandler
+    }
+    
+    private func wrapLocalHandlerWhenOffline(_ localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
+        let wrappedHandler: (Any) -> () = { response in
+            if let responseDictForOffline = response as? [String : Any] {
+                if !ConnectionManager.isConnectedToNetwork() {
+                    let syncOperation = SyncOperation(tableName: self.tableName, operation: responseDictForOffline, callback: callback)
+                    OfflineSyncManager.shared.addSyncOperation(syncOperation)
+                }
+                let responseDict = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(responseDictForOffline)
                 localResponseHandler?(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(responseDict))
             }
         }

@@ -207,7 +207,7 @@ class PersistenceServiceUtils {
         if let result = result as? [[String : Any]] {
             var resultArray = [[String : Any]]()
             for resultObject in result {
-                resultArray.append(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(resultObject))
+                resultArray.append(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
             }            
             responseHandler(resultArray)
         }
@@ -310,11 +310,11 @@ class PersistenceServiceUtils {
             let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if let resultArray = result as? [[String : Any]] {
                 let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
-                if first, let firstObject = sortedArrayAsc.first {
-                    responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(firstObject))
+                if first, let firstObject = sortedArrayAsc.first {                    
+                    responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(firstObject))
                 }
                 else if last, let lastObject = sortedArrayAsc.last {
-                    responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(lastObject))
+                    responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(lastObject))
                 }
             }
             else if result is Fault {
@@ -326,7 +326,7 @@ class PersistenceServiceUtils {
             let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if result is [[String : Any]],
                 let resultObject = (result as! [[String : Any]]).first {
-                responseHandler(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(resultObject))
+                responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
             }
             else if result is Fault {
                 errorHandler(result as! Fault)
@@ -352,28 +352,28 @@ class PersistenceServiceUtils {
         
         if relationsPageSize != nil {
             restMethod += "?relationsPageSize=\(relationsPageSize!)"
-            if related != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "&loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
                 restMethod += "&relationsDepth=" + String(relationsDepth!)
             }
         }
         else {
-            if related != nil, relationsDepth! > 0 {
+            if related != nil, relationsDepth != nil, relationsDepth! > 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString + "&relationsDepth=" + String(relationsDepth!)
             }
-            else if related != nil, relationsDepth == 0 {
+            else if related != nil, relationsDepth != nil, relationsDepth == 0 {
                 let relatedString = DataTypesUtils.shared.arrayToString(array: related!)
                 restMethod += "?loadRelations=" + relatedString
             }
-            else if related == nil, relationsDepth! > 0 {
+            else if related == nil, relationsDepth != nil, relationsDepth! > 0 {
                 restMethod += "?relationsDepth=" + String(relationsDepth!)
             }
         }
@@ -395,6 +395,11 @@ class PersistenceServiceUtils {
                 }
                 else if let resultDictionary = (result as! JSON).dictionaryObject,
                     let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                    var localStoragePolicy = queryBuilder?.localStoragePolicy
+                    if localStoragePolicy == nil {
+                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
+                    }
+                    self.saveToLocalStorage(responseDictionary, policy: localStoragePolicy!)
                     responseHandler(responseDictionary)
                 }
             }
@@ -516,6 +521,7 @@ class PersistenceServiceUtils {
     }
     
     private func saveToLocalStorage(_ dictionary: [String : Any], policy: LocalStoragePolicy) {
+        let dictionary = PersistenceLocalHelper.shared.prepareGeometryForOffline(dictionary)
         if let objectId = dictionary["objectId"] as? String {
             if policy == .storeAll {
                 let whereClause = "objectId = '\(objectId)'"

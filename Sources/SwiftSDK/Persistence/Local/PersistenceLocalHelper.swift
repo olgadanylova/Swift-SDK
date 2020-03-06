@@ -39,4 +39,32 @@ class PersistenceLocalHelper {
         resultDictionary["blPendingOperation"] = nil
         return resultDictionary
     }
+    
+    func prepareGeometryForOffline(_ dictionary: [String : Any]) -> [String : Any] {
+        var resultDictionary = dictionary
+        for (key, value) in resultDictionary {
+            if value is BLGeometry {
+                resultDictionary[key] = (value as! BLGeometry).asWkt()
+            }
+        }     
+        return resultDictionary
+    }
+    
+    func prepareOfflineObjectForResponse(_ dictionary: [String : Any]) -> [String : Any] {
+        var resultDictionary = dictionary
+        for (key, value) in resultDictionary {
+            if let stringValue = value as? String {
+                if stringValue.contains(BLPoint.wktType), let point = try? BLPoint.fromWkt(stringValue) {
+                    resultDictionary[key] = point
+                }
+                else if stringValue.contains(BLLineString.wktType), let lineString = try? BLLineString.fromWkt(stringValue) {
+                    resultDictionary[key] = lineString
+                }
+                else if stringValue.contains(BLPolygon.wktType), let polygon = try? BLPolygon.fromWkt(stringValue) {
+                    resultDictionary[key] = polygon
+                }
+            }
+        }
+        return resultDictionary
+    }
 }
