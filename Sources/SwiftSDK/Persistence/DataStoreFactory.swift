@@ -24,17 +24,20 @@
     typealias CustomType = Any
     
     public var rt: EventHandlerForClass!
+    public private(set) var isOfflineAutoSyncEnabled = false
     
     private var entityClass: AnyClass
     private var tableName: String
     
     private var persistenceServiceUtils: PersistenceServiceUtils
+    private var persistenceServiceUtilsLocal: PersistenceServiceUtilsLocal
     
     init(entityClass: AnyClass) {
         self.entityClass = entityClass
         self.tableName = PersistenceHelper.shared.getTableNameFor(self.entityClass)
         self.rt = RTFactory.shared.creteEventHandlerForClass(entityClass: entityClass, tableName: tableName)
         persistenceServiceUtils = PersistenceServiceUtils(tableName: self.tableName)
+        persistenceServiceUtilsLocal = PersistenceServiceUtilsLocal(tableName: self.tableName)
     }
     
     public func mapToTable(tableName: String) {
@@ -250,49 +253,96 @@
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: wrappedBlock, errorHandler: errorHandler)
     }
     
-    // *************************************************
-    
     public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        
+        persistenceServiceUtilsLocal.initLocalDatabase(whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func clearLocalDatabase() {
-        
+        persistenceServiceUtilsLocal.clearLocalDatabase()
     }
     
     public func enableOfflineSync() {
-        
+        isOfflineAutoSyncEnabled = true
+        OfflineSyncManager.shared.autoSyncTables.append(self.tableName)
+        OfflineSyncManager.shared.dontSyncTables.removeObject(self.tableName)
     }
     
     public func disableOfflineSync() {
-        
+        isOfflineAutoSyncEnabled = false
+        OfflineSyncManager.shared.autoSyncTables.removeObject(self.tableName)
+        OfflineSyncManager.shared.dontSyncTables.append(self.tableName)
     }
     
     public func startOfflineSync(_ callback: SyncCompletionCallback) {
-        
+       OfflineSyncManager.shared.processSyncOperationsForTable(table: self.tableName, callback: callback)
     }
     
     public func onSave(_ onSaveCallback: OnSave) {
-        
+        OfflineSyncManager.shared.onSaveCallbacks[tableName] = wrapOnSaveCallback(onSaveCallback)
     }
     
-    public func onRemove(_ onSaveCallback: OnRemove) {
-        
+    public func onRemove(_ onRemoveCallback: OnRemove) {
+        OfflineSyncManager.shared.onRemoveCallbacks[tableName] = onRemoveCallback
     }
     
     public func saveEventually(entity: Any) {
-        
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        persistenceServiceUtilsLocal.saveEventually(entity: entityDictionary, callback: nil)
     }
     
     public func saveEventually(entity: Any, callback: OfflineAwareCallback) {
-        
+        let wrappedCallback = wrapOfflineAwareCallback(callback)
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        persistenceServiceUtilsLocal.saveEventually(entity: entityDictionary, callback: wrappedCallback)
     }
     
     public func removeEventually(entity: Any) {
-        
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        persistenceServiceUtilsLocal.removeEventually(entity: entityDictionary, callback: nil)
     }
     
     public func removeEventually(entity: Any, callback: OfflineAwareCallback) {
-        
+        let wrappedCallback = wrapOfflineAwareCallback(callback)
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        persistenceServiceUtilsLocal.removeEventually(entity: entityDictionary, callback: wrappedCallback)
+    }
+    
+    private func wrapOnSaveCallback(_ onSaveCallback: OnSave) -> OnSave {
+        return OnSave(saveResponseHandler: { responseDictionary in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let responseDictionary = responseDictionary as? [String : Any],
+                let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                onSaveCallback.saveResponseHandler?(resultEntity)
+            }
+        }, errorHandler: onSaveCallback.errorHandler)
+    }
+    
+    private func wrapOnRemoveCallback(_ onRemoveCallback: OnRemove) -> OnRemove {
+        return OnRemove(removeResponseHandler: { responseDictionary in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let responseDictionary = responseDictionary as? [String : Any],
+                let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                onRemoveCallback.removeResponseHandler?(resultEntity)
+            }
+        }, errorHandler: onRemoveCallback.errorHandler)
+    }
+    
+    private func wrapOfflineAwareCallback(_ callback: OfflineAwareCallback) -> OfflineAwareCallback {
+        return OfflineAwareCallback(localResponseHandler: { localResponse in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let responseDictionary = localResponse as? [String : Any],
+                let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {                
+                callback.localResponseHandler?(resultEntity)
+            }
+        }, localErrorHandler: callback.localErrorHandler, remoteResponseHandler: { remoteResponse in
+            let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+            if let responseDictionary = remoteResponse as? [String : Any],
+                let resultEntity = PersistenceHelper.shared.dictionaryToEntity(responseDictionary, className: className) {
+                callback.remoteResponseHandler?(resultEntity)
+            }
+            else {
+                callback.remoteResponseHandler?(remoteResponse)
+            }
+        }, remoteErrorHandler: callback.remoteErrorHandler)
     }
 }

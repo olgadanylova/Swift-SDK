@@ -203,7 +203,7 @@ class PersistenceServiceUtils {
     
     private func findOffline(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let localManager = LocalManager(tableName: tableName)
-        let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+        let result = localManager.select(withDeleted: false, properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
         if let result = result as? [[String : Any]] {
             var resultArray = [[String : Any]]()
             for resultObject in result {
@@ -307,7 +307,7 @@ class PersistenceServiceUtils {
     private func findFirstOrLastOrByIdOffline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let localManager = LocalManager(tableName: tableName)
         if first || last {
-            let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+            let result = localManager.select(withDeleted: false, properties: queryBuilder?.getProperties(), whereClause: queryBuilder?.getWhereClause(), limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if let resultArray = result as? [[String : Any]] {
                 let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
                 if first, let firstObject = sortedArrayAsc.first {                    
@@ -323,7 +323,7 @@ class PersistenceServiceUtils {
         }
         else if objectId != nil {
             let whereClause = "objectId='\(objectId!)'"
-            let result = localManager.select(properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
+            let result = localManager.select(withDeleted: false, properties: queryBuilder?.getProperties(), whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.getSortBy(), groupBy: queryBuilder?.getGroupBy(), having: queryBuilder?.getHavingClause())
             if result is [[String : Any]],
                 let resultObject = (result as! [[String : Any]]).first {
                 responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
@@ -521,7 +521,6 @@ class PersistenceServiceUtils {
     }
     
     private func saveToLocalStorage(_ dictionary: [String : Any], policy: LocalStoragePolicy) {
-        let dictionary = PersistenceLocalHelper.shared.prepareGeometryForOffline(dictionary)
         if let objectId = dictionary["objectId"] as? String {
             if policy == .storeAll {
                 let whereClause = "objectId = '\(objectId)'"

@@ -144,8 +144,6 @@
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
-    // *************************************************
-    
     public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtilsLocal.initLocalDatabase(whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
     }

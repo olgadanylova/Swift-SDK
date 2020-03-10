@@ -195,6 +195,9 @@ class PersistenceHelper {
         if entityDictionary["objectId"] == nil {
             entityDictionary["objectId"] = getObjectId(entity: entity)
         }
+        if entityDictionary["blLocalId"] as? NSNumber == 0 {
+            entityDictionary["blLocalId"] = nil
+        }
         return entityDictionary
     }
     
@@ -225,7 +228,7 @@ class PersistenceHelper {
             entityClassNameWithModule = entityClassNameWithModule.components(separatedBy: ".").last!
             resultEntityType = NSClassFromString(entityClassNameWithModule) as? NSObject.Type
         }
-        if let resultEntityType = resultEntityType {
+        if let resultEntityType = resultEntityType {            
             let entity = resultEntityType.init()
             let entityClassName = getClassNameWithoutModule(entity.classForCoder)
             let entityFields = getClassPropertiesWithType(entity: entity)

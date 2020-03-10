@@ -29,7 +29,7 @@ class OfflineSyncManager {
     var onRemoveCallbacks = [String : OnRemove]()
     
     private let syncOperationsKey = "offlineSyncOperations"    
-    private var syncOperations = [SyncOperation]()    
+    private var syncOperations = [SyncOperation]()
     
     // MARK: - Init
     
@@ -42,21 +42,23 @@ class OfflineSyncManager {
         saveSyncOperationsToUserDefaults(syncOperations)
     }
     
-    func getSyncOperations() -> [SyncOperation] {
-        return syncOperations
-    }
-    
-    func getSyncOperationsFromUserDefaults() -> [String : [[String : Any]]]? {
-        let userDefaults = UserDefaults.standard
-        if let data = userDefaults.value(forKey: syncOperationsKey) as? Data {
-            return NSKeyedUnarchiver.unarchiveObject(with: data) as? [String : [[String : Any]]]
-        }
-        return nil
-    }
-    
     func removeSyncOperationAtIndex(_ index: Int) {
         syncOperations.remove(at: index)
         saveSyncOperationsToUserDefaults(syncOperations)
+    }
+    
+    func removeSyncOperation(tableName: String, entity: [String : Any]) {
+        var deleteIndexes = [Int]()
+        for i in 0 ..< syncOperations.count {
+            let syncOperation = OfflineSyncManager.shared.syncOperations[i]
+            if syncOperation.tableName == tableName, syncOperation.operation?["blLocalId"] as? NSNumber == entity["blLocalId"] as? NSNumber {
+                deleteIndexes.append(i)
+            }
+        }
+        deleteIndexes.sort(by: { $1 < $0 })
+        for index in deleteIndexes {
+            removeSyncOperationAtIndex(index)
+        }
     }
     
     func removeSyncOperations(tableName: String) {
@@ -117,6 +119,18 @@ class OfflineSyncManager {
     
     // MARK: - Private functions
     
+    private func getSyncOperations() -> [SyncOperation] {
+        return syncOperations
+    }
+    
+    private func getSyncOperationsFromUserDefaults() -> [String : [[String : Any]]]? {
+        let userDefaults = UserDefaults.standard
+        if let data = userDefaults.value(forKey: syncOperationsKey) as? Data {
+            return NSKeyedUnarchiver.unarchiveObject(with: data) as? [String : [[String : Any]]]
+        }
+        return nil
+    }
+    
     private func prepareSyncOperationsForUserDefaults(_ syncOps: [SyncOperation]) -> [String : [[String : Any]]] {
         var dictForUserDefaults = [String : [[String : Any]]]()
         for syncOperation in syncOps {
@@ -160,7 +174,7 @@ class OfflineSyncManager {
                         let onSaveCallback = onSaveCallbacks[tableName]
                         callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
                     }
-                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(operationDesc), callback: callback)
                 }
                 else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
                     if callback == nil {
@@ -194,7 +208,7 @@ class OfflineSyncManager {
                         let onSaveCallback = onSaveCallbacks[tableName]
                         callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
                     }
-                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                    psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(operationDesc), callback: callback)
                 }
                 else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
                     if callback == nil {
@@ -222,7 +236,7 @@ class OfflineSyncManager {
                             blPendingOperation.intValue == BlPendingOperation.update.rawValue {
                             let onSaveCallback = onSaveCallbacks[tableName]
                             let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
-                            psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                            psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(operationDesc), callback: callback)
                         }
                         else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
                             let onRemoveCallback = onRemoveCallbacks[tableName]
@@ -248,7 +262,7 @@ class OfflineSyncManager {
                                 blPendingOperation.intValue == BlPendingOperation.update.rawValue {
                                 let onSaveCallback = onSaveCallbacks[tableName]
                                 let callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
-                                psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc), callback: callback)
+                                psuLocal.saveEventually(entity: PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(operationDesc), callback: callback)
                             }
                             else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
                                 let onRemoveCallback = onRemoveCallbacks[tableName]
@@ -320,7 +334,7 @@ class OfflineSyncManager {
                 }
             }
             else if blPendingOperation.intValue == BlPendingOperation.delete.rawValue {
-                let syncObject = psuLocal.removeEventuallySemiAutoSync(PersistenceLocalHelper.shared.removeAllLocalFields(operationDesc))
+                let syncObject = psuLocal.removeEventuallySemiAutoSync(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(operationDesc))
                 if syncObject.syncObject == nil, syncObject.syncError == nil {
                     needRemoveAfterProcess = true
                 }
@@ -436,13 +450,13 @@ class OfflineSyncManager {
         
         var syncStatusDict = [String : SyncStatusReport]()
         for tableName in syncTables {            
-            let createSuccessObjects = prepareSuccessObjectsForRepsonse(createSuccess[tableName])
-            let updateSuccessObjects = prepareSuccessObjectsForRepsonse(updateSuccess[tableName])
-            let deleteSuccessObjects = prepareSuccessObjectsForRepsonse(deleteSuccess[tableName])
+            let createSuccessObjects = prepareSuccessObjectsForRepsonse(tableName, createSuccess[tableName])
+            let updateSuccessObjects = prepareSuccessObjectsForRepsonse(tableName, updateSuccess[tableName])
+            let deleteSuccessObjects = prepareSuccessObjectsForRepsonse(tableName, deleteSuccess[tableName])
             
-            let createErrorsObjects = prepareFailureObjectsForRepsonse(createErrors[tableName])
-            let updateErrorsObjects = prepareFailureObjectsForRepsonse(updateErrors[tableName])
-            let deleteErrorsObjects = prepareFailureObjectsForRepsonse(deleteErrors[tableName])
+            let createErrorsObjects = prepareFailureObjectsForRepsonse(tableName, createErrors[tableName])
+            let updateErrorsObjects = prepareFailureObjectsForRepsonse(tableName, updateErrors[tableName])
+            let deleteErrorsObjects = prepareFailureObjectsForRepsonse(tableName, deleteErrors[tableName])
             
             let successfulCompletion = SyncSuccess(created: createSuccessObjects, updated: updateSuccessObjects, deleted: deleteSuccessObjects)
             let failedCompletion = SyncFailure(createErrors: createErrorsObjects, updateErrors: updateErrorsObjects, deleteErrors: deleteErrorsObjects)
@@ -451,25 +465,37 @@ class OfflineSyncManager {
         return syncStatusDict
     }
     
-    private func prepareSuccessObjectsForRepsonse(_ successObjects: [Any]?) -> [Any]? {
+    private func prepareSuccessObjectsForRepsonse(_ tableName: String, _ successObjects: [Any]?) -> [Any]? {
         if let successObjects = successObjects as? [[String : Any]], !successObjects.isEmpty {
-            var resultArray = [[String : Any]]()
+            var resultArray = [Any]()
             for var object in successObjects {
                 object = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(object)
-                resultArray.append(object)
+                if let customObject = PersistenceHelper.shared.dictionaryToEntity(object, className: tableName) {
+                    resultArray.append(customObject)
+                }
+                else {
+                    resultArray.append(object)
+                }
             }
             return resultArray
         }
         return nil
     }
     
-    private func prepareFailureObjectsForRepsonse(_ failureObjects: [SyncError]?) -> [SyncError]? {
+    private func prepareFailureObjectsForRepsonse(_ tableName: String, _ failureObjects: [SyncError]?) -> [SyncError]? {
         if let failureObjects = failureObjects, !failureObjects.isEmpty {
             var resultArray = [SyncError]()
             for failureObject in failureObjects {
-                if let object = failureObject.object as? [String : Any] {
-                    let syncError = SyncError(object: PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(object), error: failureObject.error)
-                    resultArray.append(syncError)
+                if var object = failureObject.object as? [String : Any] {
+                    object = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(object)
+                    if let customObject = PersistenceHelper.shared.dictionaryToEntity(object, className: tableName) {
+                        let syncError = SyncError(object: customObject, error: failureObject.error)
+                        resultArray.append(syncError)
+                    }
+                    else {
+                        let syncError = SyncError(object: object, error: failureObject.error)
+                        resultArray.append(syncError)
+                    }
                 }
             }
             return resultArray

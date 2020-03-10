@@ -107,7 +107,7 @@ class LocalManager {
     }
     
     func recordExists(whereClause: String) -> Bool {
-        if let selectedRecords = select(properties: ["*"], whereClause: parseWhereClauseWithGrammar(whereClause), limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil) as? [[String : Any]], selectedRecords.first != nil {
+        if let selectedRecords = select(withDeleted: false, properties: ["*"], whereClause: parseWhereClauseWithGrammar(whereClause), limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil) as? [[String : Any]], selectedRecords.first != nil {
             return true
         }
         return false
@@ -124,6 +124,7 @@ class LocalManager {
     }
     
     func insert(object: [String : Any], blPendingOperation: BlPendingOperation, localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?) {
+        let object = PersistenceLocalHelper.shared.prepareGeometryForOffline(object)
         let cmd = prepareInsertCommand(object: object, blPendingOperation: blPendingOperation.rawValue)
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
@@ -140,6 +141,7 @@ class LocalManager {
     }
     
     func update(newValues: [String : Any], whereClause: String, blPendingOperation: BlPendingOperation, localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?) {
+        let newValues = PersistenceLocalHelper.shared.prepareGeometryForOffline(newValues)
         let existingColumns = getColumns()
         var valuesString = ""
         for (key, value) in newValues {
@@ -166,6 +168,14 @@ class LocalManager {
             }
             else if result is Fault {
                 localErrorHandler?(result as! Fault)
+            }
+            else {
+                // ⚠️ result not found because it is prepared for deleting
+                let result = select(withDeleted: true, properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
+                if result is [[String : Any]],
+                    let updatedObject = (result as! [[String : Any]]).first {
+                    localResponseHandler?(updatedObject)
+                }
             }
         }
         else {
@@ -197,21 +207,29 @@ class LocalManager {
     }
     
     func select() -> Any {
-        return select(properties: nil, whereClause: nil, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
+        return select(withDeleted: false, properties: nil, whereClause: nil, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
     }
     
     func select(whereClause: String) -> Any {
-        return select(properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
+        return select(withDeleted: false, properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
     }
     
-    func select(properties: [String]?, whereClause: String?, limit: Int?, offset: Int?, orderBy: [String]?, groupBy: [String]?, having: String?) -> Any {
+    func select(withDeleted: Bool, properties: [String]?, whereClause: String?, limit: Int?, offset: Int?, orderBy: [String]?, groupBy: [String]?, having: String?) -> Any {
         var resultArray = [[String : Any]]()
         var props = properties
         if props == nil { props = ["*"] }
         let columnList = DataTypesUtils.shared.arrayToString(array: props!)
-        var cmd = "SELECT \(columnList) FROM \(tableName) WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue)"
+        var cmd = "SELECT \(columnList) FROM \(tableName)"
+        if !withDeleted {
+            cmd += " WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue)"
+        }
         if whereClause != nil, !whereClause!.isEmpty {
-            cmd += " AND \(parseWhereClauseWithGrammar(whereClause!))"
+            if !withDeleted {
+                cmd += " AND \(parseWhereClauseWithGrammar(whereClause!))"
+            }
+            else {
+                cmd += " WHERE \(parseWhereClauseWithGrammar(whereClause!))"
+            }
         }
         if orderBy != nil {
             let orderByString = DataTypesUtils.shared.arrayToString(array: orderBy!)
@@ -229,7 +247,7 @@ class LocalManager {
         }
         if offset != nil {
             cmd += " OFFSET \(offset!)"
-        }
+        }      
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) != SQLITE_OK {
             let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))

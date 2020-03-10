@@ -49,6 +49,7 @@
             localManager = LocalManager(tableName: tableName)
             localManager.dropTable()
         }
+        OfflineSyncManager.shared.removeAllSyncOperations()
     }
     
     public func enableOfflineAutoSync() {

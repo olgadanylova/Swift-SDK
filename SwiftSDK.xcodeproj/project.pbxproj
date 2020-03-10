@@ -88,6 +88,7 @@
 		5E78C00823F2B7E2003AE9B0 /* libsqlite3.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 5E78C00723F2B7DC003AE9B0 /* libsqlite3.tbd */; };
 		5E7955962254D9A300E8ED65 /* BackendlessFileInfo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7955952254D9A300E8ED65 /* BackendlessFileInfo.swift */; };
 		5E795598225503D900E8ED65 /* FilePermission.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E795597225503D900E8ED65 /* FilePermission.swift */; };
+		5E7BA37E2417964B000CBD73 /* BackendlessObject.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7BA37D2417964B000CBD73 /* BackendlessObject.swift */; };
 		5E7E8A6021ECC94A00AA04E1 /* UserDefaultsHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E7E8A5F21ECC94A00AA04E1 /* UserDefaultsHelper.swift */; };
 		5E81B28D2236A8300015AEDC /* RTMethod.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E81B28C2236A8300015AEDC /* RTMethod.swift */; };
 		5E84136321B5265200869794 /* UserService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E84136221B5265200869794 /* UserService.swift */; };
@@ -415,6 +416,7 @@
 		5E78C00723F2B7DC003AE9B0 /* libsqlite3.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libsqlite3.tbd; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS13.2.sdk/usr/lib/libsqlite3.tbd; sourceTree = DEVELOPER_DIR; };
 		5E7955952254D9A300E8ED65 /* BackendlessFileInfo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessFileInfo.swift; sourceTree = "<group>"; };
 		5E795597225503D900E8ED65 /* FilePermission.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilePermission.swift; sourceTree = "<group>"; };
+		5E7BA37D2417964B000CBD73 /* BackendlessObject.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendlessObject.swift; sourceTree = "<group>"; };
 		5E7E8A5F21ECC94A00AA04E1 /* UserDefaultsHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDefaultsHelper.swift; sourceTree = "<group>"; };
 		5E81B28C2236A8300015AEDC /* RTMethod.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RTMethod.swift; sourceTree = "<group>"; };
 		5E84136221B5265200869794 /* UserService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserService.swift; sourceTree = "<group>"; };
@@ -678,6 +680,7 @@
 		0E392E1DBB70E48EDE9602D1 /* Pods */ = {
 			isa = PBXGroup;
 			children = (
+				5E15471D23FAC8AE00A4A35F /* LocalPolicy.swift */,
 				0A65D4D4B09AB17C58C2CB9B /* Pods-SwiftSDK.debug.xcconfig */,
 				32E4838F9B94DA7CCC41B970 /* Pods-SwiftSDK.release.xcconfig */,
 				DD49F102D2CD9977AE5BA696 /* Pods-SwiftSDKTests.debug.xcconfig */,
@@ -912,13 +915,13 @@
 				5E78C00223F2B6C7003AE9B0 /* PersistenceServiceUtilsLocal.swift */,
 				5E78C00523F2B7B1003AE9B0 /* LocalManager.swift */,
 				5E8F81E423FA7B6600567626 /* OfflineCallbacks.swift */,
-				5E15471D23FAC8AE00A4A35F /* LocalPolicy.swift */,
 				5E9C399C23FD37E7004BC9BB /* LocalIdentifiable.swift */,
 				5EF6139223FD3ADD00588E56 /* PersistenceLocalHelper.swift */,
 				5ED8A22B23FE6E0100E4F754 /* OfflineSyncManager.swift */,
 				5ED8A25123FE8CEB00E4F754 /* SyncOperation.swift */,
 				5ED853232407D30300FEACED /* SyncStatusReport.swift */,
 				5ED853252407F70700FEACED /* SyncObject.swift */,
+				5E7BA37D2417964B000CBD73 /* BackendlessObject.swift */,
 			);
 			path = Local;
 			sourceTree = "<group>";
@@ -1782,6 +1785,7 @@
 				5E4E309C2243B85C00B479C8 /* DeviceHelper.swift in Sources */,
 				5EFB60E922422F93004DFA2C /* UserInfo.swift in Sources */,
 				5E99C2AE23F2BB39000AF689 /* StarLoopbackState.swift in Sources */,
+				5E7BA37E2417964B000CBD73 /* BackendlessObject.swift in Sources */,
 				5E99C28623F2BB39000AF689 /* CommonTokenFactory.swift in Sources */,
 				5E81B28D2236A8300015AEDC /* RTMethod.swift in Sources */,
 				5E99C29823F2BB39000AF689 /* Recognizer.swift in Sources */,
