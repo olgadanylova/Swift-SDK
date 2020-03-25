@@ -36,7 +36,6 @@ class PersistenceServiceUtilsLocal {
     // MARK: - Init local database
     
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        localManager.createTableIfNotExist()
         let recordsCount: Any = localManager.getNumberOfRecords(whereClause: nil)
         if recordsCount is Fault {
             errorHandler(recordsCount as! Fault)
@@ -81,12 +80,13 @@ class PersistenceServiceUtilsLocal {
     // MARK: - Internal functions
     
     func clearLocalDatabase() {
-        localManager.dropTable()
-        OfflineSyncManager.shared.removeSyncOperations(tableName: self.tableName)
+        if localManager.tableExists(tableName: tableName) {
+            localManager.dropTable()
+            OfflineSyncManager.shared.removeSyncOperations(tableName: self.tableName)
+        }        
     }
     
     func saveEventually(entity: [String : Any], callback: OfflineAwareCallback?) {
-        localManager.createTableIfNotExist()
         if ConnectionManager.isConnectedToNetwork() {
             saveEventuallyWhenOnline(entity, callback: callback)
         }

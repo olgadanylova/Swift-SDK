@@ -43,9 +43,10 @@ class LocalManager {
         self.tableName = tableName
         dbUrl = try! FileManager.default.url(for: .documentDirectory, in: .userDomainMask, appropriateFor: nil, create: false).appendingPathComponent("myDB.sqlite")
         openDB()
-        if !tableName.isEmpty {
+        // ⚠️ check if works correctly!
+        /*if !tableName.isEmpty {
             createTableIfNotExist()
-        }
+        }*/
     }
     
     deinit {
@@ -115,6 +116,7 @@ class LocalManager {
     
     // this method is called only in the func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
     func initInsert(object: [String : Any], errorHandler: ((Fault) -> Void)!) {
+        createTableIfNotExist()
         let cmd = prepareInsertCommand(object: object, blPendingOperation: BlPendingOperation.none.rawValue)
         var statement: OpaquePointer?
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) != SQLITE_OK || sqlite3_step(statement) != SQLITE_DONE {
@@ -124,6 +126,7 @@ class LocalManager {
     }
     
     func insert(object: [String : Any], blPendingOperation: BlPendingOperation, localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?) {
+        createTableIfNotExist()
         let object = PersistenceLocalHelper.shared.prepareGeometryForOffline(object)
         let cmd = prepareInsertCommand(object: object, blPendingOperation: blPendingOperation.rawValue)
         var statement: OpaquePointer?
@@ -139,7 +142,7 @@ class LocalManager {
             localErrorHandler?(fault)
         }
     }
-    
+ 
     func update(newValues: [String : Any], whereClause: String, blPendingOperation: BlPendingOperation, localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?) {
         let newValues = PersistenceLocalHelper.shared.prepareGeometryForOffline(newValues)
         let existingColumns = getColumns()
@@ -216,80 +219,82 @@ class LocalManager {
     
     func select(withDeleted: Bool, properties: [String]?, whereClause: String?, limit: Int?, offset: Int?, orderBy: [String]?, groupBy: [String]?, having: String?) -> Any {
         var resultArray = [[String : Any]]()
-        var props = properties
-        if props == nil { props = ["*"] }
-        let columnList = DataTypesUtils.shared.arrayToString(array: props!)
-        var cmd = "SELECT \(columnList) FROM \(tableName)"
-        if !withDeleted {
-            cmd += " WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue)"
-        }
-        if whereClause != nil, !whereClause!.isEmpty {
+        if tableExists(tableName: tableName) {
+            var props = properties
+            if props == nil { props = ["*"] }
+            let columnList = DataTypesUtils.shared.arrayToString(array: props!)
+            var cmd = "SELECT \(columnList) FROM \(tableName)"
             if !withDeleted {
-                cmd += " AND \(parseWhereClauseWithGrammar(whereClause!))"
+                cmd += " WHERE blPendingOperation != \(BlPendingOperation.delete.rawValue)"
             }
-            else {
-                cmd += " WHERE \(parseWhereClauseWithGrammar(whereClause!))"
+            if whereClause != nil, !whereClause!.isEmpty {
+                if !withDeleted {
+                    cmd += " AND \(parseWhereClauseWithGrammar(whereClause!))"
+                }
+                else {
+                    cmd += " WHERE \(parseWhereClauseWithGrammar(whereClause!))"
+                }
             }
-        }
-        if orderBy != nil {
-            let orderByString = DataTypesUtils.shared.arrayToString(array: orderBy!)
-            cmd += " ORDER BY \(orderByString)"
-        }
-        if groupBy != nil {
-            let groupByString = DataTypesUtils.shared.arrayToString(array: groupBy!)
-            cmd += " GROUP BY \(groupByString)"
-        }
-        if having != nil {
-            cmd += " HAVING \(parseWhereClauseWithGrammar(having!))"
-        }
-        if limit != nil {
-            cmd += " LIMIT \(limit!)"
-        }
-        if offset != nil {
-            cmd += " OFFSET \(offset!)"
-        }      
-        var statement: OpaquePointer?
-        if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) != SQLITE_OK {
-            let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
-            return Fault(message: errorMessage, faultCode: 0)
-        }
-        let tableColumns = getColumns()
-        while(sqlite3_step(statement) == SQLITE_ROW) {
-            var object = [String : Any]()
-            for i in 0..<tableColumns.count {
-                if let currentColumn = sqlite3_column_name(statement, Int32(i)) {
-                    let columnName = String(cString: currentColumn)
-                    if columnName == "blLocalId" || columnName == "blPendingOperation" ||
-                        columnName == "created" || columnName == "updated" || columnName == "blLocalTimestamp" {
-                        let intValue = sqlite3_column_int64(statement, Int32(i))
-                        object[columnName] = intValue
-                    }
-                    else if columnName == "objectId" || columnName == "ownerId" {
-                        if let stringValue = sqlite3_column_text(statement, Int32(i)) {
-                            object[columnName] = String(cString: stringValue)
-                        }
-                    }
-                    else {
-                        let columnType = tableColumns[columnName]
-                        if columnType == "INTEGER" {
+            if orderBy != nil {
+                let orderByString = DataTypesUtils.shared.arrayToString(array: orderBy!)
+                cmd += " ORDER BY \(orderByString)"
+            }
+            if groupBy != nil {
+                let groupByString = DataTypesUtils.shared.arrayToString(array: groupBy!)
+                cmd += " GROUP BY \(groupByString)"
+            }
+            if having != nil {
+                cmd += " HAVING \(parseWhereClauseWithGrammar(having!))"
+            }
+            if limit != nil {
+                cmd += " LIMIT \(limit!)"
+            }
+            if offset != nil {
+                cmd += " OFFSET \(offset!)"
+            }
+            var statement: OpaquePointer?
+            if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) != SQLITE_OK {
+                let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
+                return Fault(message: errorMessage, faultCode: 0)
+            }
+            let tableColumns = getColumns()
+            while(sqlite3_step(statement) == SQLITE_ROW) {
+                var object = [String : Any]()
+                for i in 0..<tableColumns.count {
+                    if let currentColumn = sqlite3_column_name(statement, Int32(i)) {
+                        let columnName = String(cString: currentColumn)
+                        if columnName == "blLocalId" || columnName == "blPendingOperation" ||
+                            columnName == "created" || columnName == "updated" || columnName == "blLocalTimestamp" {
                             let intValue = sqlite3_column_int64(statement, Int32(i))
                             object[columnName] = intValue
                         }
-                        else if columnType == "REAL" {
-                            let doubleValue = sqlite3_column_double(statement, Int32(i))
-                            object[columnName] = doubleValue
-                        }
-                        else if columnType == "TEXT" {
+                        else if columnName == "objectId" || columnName == "ownerId" {
                             if let stringValue = sqlite3_column_text(statement, Int32(i)) {
                                 object[columnName] = String(cString: stringValue)
                             }
                         }
+                        else {
+                            let columnType = tableColumns[columnName]
+                            if columnType == "INTEGER" {
+                                let intValue = sqlite3_column_int64(statement, Int32(i))
+                                object[columnName] = intValue
+                            }
+                            else if columnType == "REAL" {
+                                let doubleValue = sqlite3_column_double(statement, Int32(i))
+                                object[columnName] = doubleValue
+                            }
+                            else if columnType == "TEXT" {
+                                if let stringValue = sqlite3_column_text(statement, Int32(i)) {
+                                    object[columnName] = String(cString: stringValue)
+                                }
+                            }
+                        }
                     }
                 }
+                resultArray.append(object)
             }
-            resultArray.append(object)
+            sqlite3_finalize(statement)
         }
-        sqlite3_finalize(statement)
         return resultArray
     }
     

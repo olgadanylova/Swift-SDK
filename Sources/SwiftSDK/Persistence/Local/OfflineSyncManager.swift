@@ -254,7 +254,6 @@ class OfflineSyncManager {
         if let syncOps = getSyncOperationsFromUserDefaults() {
             for (tableName, operationsArray) in syncOps {
                 if autoSyncTables.contains(tableName) {
-                    // operationsArray = operationsArray.sorted(by: { ($0["blLocalTimestamp"] as? Int ?? 0) < ($1["blLocalTimestamp"] as? Int ?? 0) })
                     for operationDesc in operationsArray {
                         if let blPendingOperation = operationDesc["blPendingOperation"] as? NSNumber {
                             let psuLocal = PersistenceServiceUtilsLocal(tableName: tableName)

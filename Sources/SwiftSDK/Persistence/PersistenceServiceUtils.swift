@@ -47,17 +47,22 @@ class PersistenceServiceUtils {
         })
     }
     
-    func create(entity: [String : Any], responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+    func create(entity: [String : Any], responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {        
         let headers = ["Content-Type": "application/json"]
-        let parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity)
+        var parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity)
+        parameters = PersistenceLocalHelper.shared.removeAllLocalFields(parameters)
         BackendlessRequestManager(restMethod: "data/\(tableName)", httpMethod: .post, headers: headers, parameters: parameters).makeRequest(getResponse: { response in
             if let result = ProcessResponse.shared.adapt(response: response, to: JSON.self) {
                 if result is Fault {
                     errorHandler(result as! Fault)
                 }
-                else if let resultDictionary = (result as! JSON).dictionaryObject,
-                    let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
-                    responseHandler(responseDictionary)
+                else if let resultDictionary = (result as! JSON).dictionaryObject {
+                    if let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                        responseHandler(responseDictionary)
+                    }
+                    else {
+                        responseHandler(resultDictionary)
+                    }
                 }
             }
         })
@@ -66,8 +71,10 @@ class PersistenceServiceUtils {
     func createBulk(entities: [[String: Any]], responseHandler: (([String]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
         var parameters = [[String: Any]]()
-        for entity in entities {
-            parameters.append(PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity))
+        for var entity in entities {
+            entity = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity)
+            entity = PersistenceLocalHelper.shared.removeAllLocalFields(entity)
+            parameters.append(entity)
         }
         BackendlessRequestManager(restMethod: "data/bulk/\(tableName)", httpMethod: .post, headers: headers, parameters: parameters).makeRequest(getResponse: { response in
             if let result = ProcessResponse.shared.adapt(response: response, to: [String].self) {
@@ -83,7 +90,8 @@ class PersistenceServiceUtils {
     
     func update(entity: [String : Any], responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
-        let parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity)
+        var parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(entity)
+        parameters = PersistenceLocalHelper.shared.removeAllLocalFields(parameters)
         if let objectId = entity["objectId"] as? String {
             BackendlessRequestManager(restMethod: "data/\(tableName)/\(objectId)", httpMethod: .put, headers: headers, parameters: parameters).makeRequest(getResponse: { response in
                 if let result = ProcessResponse.shared.adapt(response: response, to: JSON.self) {
@@ -99,9 +107,13 @@ class PersistenceServiceUtils {
                             updatedUser.setUserToken(value: currentToken)
                             Backendless.shared.userService.setPersistentUser(currentUser: updatedUser)
                         }
-                        else if let resultDictionary = (result as! JSON).dictionaryObject,
-                            let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
-                            responseHandler(responseDictionary)
+                        if let resultDictionary = (result as! JSON).dictionaryObject {
+                            if let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                                responseHandler(responseDictionary)
+                            }
+                            else {
+                                responseHandler(resultDictionary)
+                            }
                         }
                     }
                 }
@@ -111,7 +123,8 @@ class PersistenceServiceUtils {
     
     func updateBulk(whereClause: String?, changes: [String : Any], responseHandler: ((Int) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
-        let parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(changes)
+        var parameters = PersistenceHelper.shared.convertDictionaryValuesFromGeometryType(changes)
+        parameters = PersistenceLocalHelper.shared.removeAllLocalFields(parameters)
         var restMethod = "data/bulk/\(tableName)"
         if whereClause != nil, whereClause?.count ?? 0 > 0 {
             restMethod += "?where=\(whereClause!)"
@@ -208,7 +221,7 @@ class PersistenceServiceUtils {
             var resultArray = [[String : Any]]()
             for resultObject in result {
                 resultArray.append(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
-            }            
+            }
             responseHandler(resultArray)
         }
         else if result is Fault {
@@ -239,6 +252,17 @@ class PersistenceServiceUtils {
                 parameters["props"] = props
             }
         }
+        if let excludedProperties = queryBuilder?.getExcludedProperties() {
+            var excludeProps = [String]()
+            for property in excludedProperties {
+                if !property.isEmpty {
+                    excludeProps.append(property)
+                }
+            }
+            if !excludeProps.isEmpty {
+                parameters["excludeProps"] = DataTypesUtils.shared.arrayToString(array: excludeProps)
+            }
+        }
         if let sortBy = queryBuilder?.getSortBy(), sortBy.count > 0 {
             parameters["sortBy"] = DataTypesUtils.shared.arrayToString(array: sortBy)
         }
@@ -265,10 +289,14 @@ class PersistenceServiceUtils {
                 else {
                     var resultArray = [[String: Any]]()
                     for resultObject in result as! [JSON] {
-                        if let resultDictionary = resultObject.dictionaryObject,
-                            let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
-                            resultArray.append(responseDictionary)
-                        }
+                        if let resultDictionary = resultObject.dictionaryObject {
+                            if let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                                resultArray.append(responseDictionary)
+                            }
+                            else {
+                                resultArray.append(resultDictionary)
+                            }
+                        }                            
                     }
                     var localStoragePolicy = queryBuilder?.localStoragePolicy
                     if localStoragePolicy == nil {
@@ -315,6 +343,9 @@ class PersistenceServiceUtils {
                 }
                 else if last, let lastObject = sortedArrayAsc.last {
                     responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(lastObject))
+                }
+                else {
+                    responseHandler([String : Any]())
                 }
             }
             else if result is Fault {
@@ -388,19 +419,36 @@ class PersistenceServiceUtils {
                 restMethod += "&props=" + DataTypesUtils.shared.arrayToString(array: props)
             }
         }
+        if let excludedProperties = queryBuilder?.getExcludedProperties() {
+            var excludeProps = [String]()
+            for property in excludedProperties {
+                if !property.isEmpty {
+                    excludeProps.append(property)
+                }
+            }
+            if !excludeProps.isEmpty {
+                restMethod += "&excludeProps=" + DataTypesUtils.shared.arrayToString(array: excludeProps)
+            }
+        }
         BackendlessRequestManager(restMethod: restMethod, httpMethod: .get, headers: nil, parameters: nil).makeRequest(getResponse: { response in
             if let result = ProcessResponse.shared.adapt(response: response, to: JSON.self) {
                 if result is Fault {
                     errorHandler(result as! Fault)
                 }
-                else if let resultDictionary = (result as! JSON).dictionaryObject,
-                    let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                else if let resultDictionary = (result as! JSON).dictionaryObject {
+                    var resultDict = [String: Any]()
+                    if let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                        resultDict = responseDictionary
+                    }
+                    else {
+                        resultDict = resultDictionary
+                    }
                     var localStoragePolicy = queryBuilder?.localStoragePolicy
                     if localStoragePolicy == nil {
                         localStoragePolicy = Backendless.shared.data.localStoragePolicy
                     }
-                    self.saveToLocalStorage(responseDictionary, policy: localStoragePolicy!)
-                    responseHandler(responseDictionary)
+                    self.saveToLocalStorage(resultDict, policy: localStoragePolicy!)
+                    responseHandler(resultDict)
                 }
             }
         })
