@@ -68,6 +68,12 @@ class UserDefaultsHelper {
     }
     
     func saveCurrentUser(currentUser: BackendlessUser) {
+        for (key, value) in currentUser.properties {
+            let jsonValue = JSONUtils.shared.objectToJson(objectToParse: value)
+            if jsonValue is [String : Any] || jsonValue is [[String : Any]] {
+                currentUser.userProperties[key] = JSON(jsonValue)
+            }
+        }
         let data = try? JSONEncoder().encode(currentUser)
         let userDefaults = UserDefaults.standard
         userDefaults.set(data, forKey: UserDefaultsKeys.currentUser)

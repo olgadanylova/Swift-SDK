@@ -45,8 +45,8 @@ class PersistenceServiceUtilsLocal {
         }
         else {
             let queryBuilder = DataQueryBuilder()
-            queryBuilder.setWhereClause(whereClause: whereClause)
-            queryBuilder.setPageSize(pageSize: 100)
+            queryBuilder.whereClause = whereClause
+            queryBuilder.pageSize = 100
             persistenceServiceUtils.find(queryBuilder: queryBuilder, responseHandler: { foundObjects in
                 if foundObjects.count > 0 {
                     for object in foundObjects {
