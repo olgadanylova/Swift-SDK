@@ -53,10 +53,12 @@ class PersistenceHelper {
         else if let objectId = StoredObjects.shared.getObjectId(forObject: entity as! AnyHashable) {
             return objectId
         }
-        let entityDict = PersistenceHelper.shared.entityToDictionary(entity: entity)
-        if let objectId = entityDict ["objectId"] as? String {
-            return objectId
-        }
+        let entityProperties = Mirror(reflecting: entity).children
+        for (name, value) in entityProperties {
+            if name == "objectId" {
+                return value as? String
+            }
+        }        
         return nil
     }
     
@@ -127,7 +129,7 @@ class PersistenceHelper {
     func entityToDictionary(entity: Any) -> [String: Any] {
         if let user = entity as? BackendlessUser {
             var userDict = [String : Any]()
-            let userProperties = user.getProperties()
+            let userProperties = user.properties
             for (key, value) in userProperties {
                 userDict[key] = value
             }
@@ -237,7 +239,7 @@ class PersistenceHelper {
             entityClassNameWithModule = getClassNameWithModule(entityClassNameWithModule)
             resultEntityType = NSClassFromString(entityClassNameWithModule) as? NSObject.Type
         }
-        if resultEntityType == nil {
+        if resultEntityType == nil {            
             entityClassNameWithModule = entityClassNameWithModule.components(separatedBy: ".").last!
             resultEntityType = NSClassFromString(entityClassNameWithModule) as? NSObject.Type
         }
@@ -276,7 +278,7 @@ class PersistenceHelper {
             }
             return entity
         }
-        return nil
+        return dictionary
     }
     
     // MARK: - Private functions
@@ -300,7 +302,7 @@ class PersistenceHelper {
             name = classMappings[name]!
         }
         else {
-            var bundleName = Bundle.main.infoDictionary![kCFBundleNameKey as String] as! String
+            var bundleName = Bundle.main.infoDictionary![kCFBundleExecutableKey as String] as! String
             bundleName = bundleName.replacingOccurrences(of: " ", with: "_")
             bundleName = bundleName.replacingOccurrences(of: "-", with: "_")
             name = bundleName + "." + name
@@ -375,6 +377,15 @@ class PersistenceHelper {
         if valueType.contains("NSDate"), value is Int {
             return DataTypesUtils.shared.intToDate(intVal: value as! Int)
         }
+        
+            
+        // BKNDLSS-21285
+        /*else if valueType.contains("NSDate"), value is String {
+            let intValue = Int(value as! String)
+            return DataTypesUtils.shared.intToDate(intVal: intValue!)
+        }*/
+            
+            
         else if valueType.contains("BackendlessFile"), value is String {
             let backendlessFile = BackendlessFile()
             backendlessFile.fileUrl = value as? String

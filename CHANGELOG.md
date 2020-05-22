@@ -1,9 +1,42 @@
 # RELEASE HISTORY
 
+### 5.7.16 / May 20, 2020
+* the BackendlessUser and UserService properties became public, get/set methods are marked as deprecated
+* fixed crash when saving object which doesn't have the `objectId` property
+* fixed the `BackendlessDataCollection` issue when trying to delette the last object from the collection
+* the Backendless `Identifiable` protocol for the `BackendlessDataCollection` renamed to `BLIdentifiable` to avoid the confusion with Swift's `Identifiable` protocol
+
+### 5.7.15 / May 7, 2020
+* fixed issue when Custom Class attached to User was Null when `stayLoggedIn` in is true
+
+### 5.7.14 / May 6, 2020
+* fixed issue when user property is object of custom class
+* fixed issue with class casting when Bunlde Name and Bundle Executable Name have different values
+
+### 5.7.13 / April 30, 2020
+* fixed the FileService `remove` method response
+* tests fixed
+
+### 5.7.12 / April 28, 2020
+* the `EmailBodyparts` class renamed to the `EmailBodyParts`
+* fixed issue with BLGeometry in BackendlessUser properties
+
+### 5.7.11 / April 27, 2020
+* fixed issue with current user after the Twitter login
+
+### 5.7.10 / April 22, 2020
+* DataQueryBuilder `excludedProperties` renamed to `excludeProperties`
+
+### 5.7.9 / April 10, 2020
+* added support for smart-text in rich media url
+
+### 5.7.8 / April 6, 2020
+* fixed issue with Backendless.shared.customService.invoke callback crash
+
 ### 5.7.7 / March 17, 2020
 * the `properties` of DataQueryBuilder and LoadRelationsQueryBuilder fixed to return all values when user set only one property as empty string
-* the `addAllProperties`, `excludeProperty`, `excludeProperties` methods added to the DataQueryBuilder 
-* fixed issue when DataStore methods didn't process Backendless types in response 
+* the `addAllProperties`, `excludeProperty`, `excludeProperties` methods added to the DataQueryBuilder
+* fixed issue when DataStore methods didn't process Backendless types in response
 
 ### 5.7.6 / February 25, 2020
 * fixed class to table mapping issue
@@ -20,7 +53,7 @@
 
 ### 5.7.3 / January 28, 2020
 * fixed `isValidUserToken` method to return error when Internet connection is not available
-* refactored Fault contructor to handle URLSession errors correctly 
+* refactored Fault contructor to handle URLSession errors correctly
 * fixed tests according to the last server changes
 
 ### 5.7.2 / January 24, 2020
@@ -42,7 +75,7 @@ func loginWithTwitter(authToken: String, authTokenSecret: String, guestUser: Bac
 
 func loginWithGoogle(accessToken: String, guestUser: BackendlessUser, fieldsMapping: [String: String], responseHandler: ((BackendlessUser) -> Void)!, errorHandler: ((Fault) -> Void)!)
 ```
-* added function to DataQueryBuilder and LoadRelationsQueryBuilder: 
+* added function to DataQueryBuilder and LoadRelationsQueryBuilder:
 ```
 func addProperties(properties: String...)
 ```

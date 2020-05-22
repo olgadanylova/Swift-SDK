@@ -19,15 +19,15 @@
  *  ********************************************************************************************************************
  */
 
+enum UserDefaultsKeys {
+    static let persistentUserToken = "userTokenKey"
+    static let stayLoggedIn = "stayLoggedInKey"
+    static let currentUser = "currentUserKey"
+}
+
 class UserDefaultsHelper {
     
     static let shared = UserDefaultsHelper()
-    
-    enum UserDefaultsKeys {
-        static let persistentUserToken = "userTokenKey"
-        static let stayLoggedIn = "stayLoggedInKey"
-        static let currentUser = "currentUserKey"
-    }
     
     private init() { }
     
@@ -35,7 +35,7 @@ class UserDefaultsHelper {
         let userDefaults = UserDefaults.standard
         let userToken: [String: String] = ["user-token": token]
         userDefaults.setValue(userToken, forKey: UserDefaultsKeys.persistentUserToken)
-        userDefaults.synchronize()
+        //userDefaults.synchronize()
     }
     
     func getPersistentUserToken() -> String? {
@@ -55,7 +55,7 @@ class UserDefaultsHelper {
         let userDefaults = UserDefaults.standard
         let loggedIn: [String: NSNumber] = ["stayLoggedIn": NSNumber(booleanLiteral: stayLoggedIn)]
         userDefaults.setValue(loggedIn, forKey: UserDefaultsKeys.stayLoggedIn)
-        userDefaults.synchronize()
+        //userDefaults.synchronize()
     }
     
     func getStayLoggedIn() -> Bool {
@@ -71,7 +71,6 @@ class UserDefaultsHelper {
         let data = try? JSONEncoder().encode(currentUser)
         let userDefaults = UserDefaults.standard
         userDefaults.set(data, forKey: UserDefaultsKeys.currentUser)
-        userDefaults.synchronize()
     }
     
     func getCurrentUser() -> BackendlessUser? {
