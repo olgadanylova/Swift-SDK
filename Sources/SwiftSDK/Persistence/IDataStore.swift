@@ -52,4 +52,10 @@ protocol IDataStore {
     func deleteRelation(columnName: String, parentObjectId: String, childrenObjectIds: [String], responseHandler: ((Int) -> Void)!, errorHandler: ((Fault) -> Void)!)
     func deleteRelation(columnName: String, parentObjectId: String, whereClause: String?, responseHandler: ((Int) -> Void)!, errorHandler: ((Fault) -> Void)!)
     func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([Any]) -> Void)!, errorHandler: ((Fault) -> Void)!)
+    
+    func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
+    func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
+    func clearLocalDatabase()
+    func onSave(_ onSaveCallback: OnSave)
+    func onRemove(_ onSaveCallback: OnRemove)  
 }

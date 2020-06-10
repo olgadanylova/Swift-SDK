@@ -211,4 +211,26 @@
         }
         return wrappedBlock
     }
+    
+    // *******************************************
+    
+    public func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+
+    }
+    
+    public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        
+    }
+    
+    public func clearLocalDatabase() {
+        
+    }
+    
+    public func onSave(_ onSaveCallback: OnSave) {
+        
+    }
+    
+    public func onRemove(_ onSaveCallback: OnRemove) {
+        
+    }
 }

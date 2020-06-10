@@ -82,7 +82,7 @@ public class BackendlessDataCollection: Collection {
     
     public convenience init(entityType: AnyClass) {
         let dataQueryBuilder = DataQueryBuilder()
-        dataQueryBuilder.pageSize = 50
+        dataQueryBuilder.pageSize = 100
         dataQueryBuilder.offset = 0
         self.init(entityType: entityType, queryBuilder: dataQueryBuilder)
     }

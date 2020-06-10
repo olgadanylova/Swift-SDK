@@ -25,8 +25,9 @@
     
     public var rt: EventHandlerForMap!
     
-    private var tableName: String
+    public private(set) var isOfflineAutoSyncEnabled = false
     
+    private var tableName: String
     private var persistenceServiceUtils: PersistenceServiceUtils
     
     init(tableName: String) {
@@ -140,5 +141,67 @@
     
     public func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         persistenceServiceUtils.loadRelations(objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+    }
+    
+    // ****************************************************************************************
+    
+    public func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        PersistenceServiceUtilsLocal.shared.initLocalDatabase(tableName: tableName, whereClause: nil, responseHandler: responseHandler, errorHandler: errorHandler)
+    }
+    
+    public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        PersistenceServiceUtilsLocal.shared.initLocalDatabase(tableName: tableName, whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
+    }
+    
+    public func clearLocalDatabase() {
+        PersistenceServiceUtilsLocal.shared.clearLocalDatabase(tableName)
+    }
+    
+    public func onSave(_ onSaveCallback: OnSave) {
+        OfflineSyncManager.shared.onSaveCallbacks[tableName] = onSaveCallback
+    }
+    
+    public func onRemove(_ onRemoveCallback: OnRemove) {
+        OfflineSyncManager.shared.onRemoveCallbacks[tableName] = onRemoveCallback
+    }
+    
+    public func saveEventually(entity: [String : Any]) {
+        PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: entity, callback: nil)
+    }
+    
+    public func saveEventually(entity: [String : Any], callback: OfflineAwareCallback) {
+        PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: entity, callback: callback)
+    }
+    
+    public func removeEventually(entity: [String : Any]) {
+        PersistenceServiceUtilsLocal.shared.removeEventually(entity: entity, callback: nil)
+    }
+    
+    public func removeEventually(entity: [String : Any], callback: OfflineAwareCallback) {
+        PersistenceServiceUtilsLocal.shared.removeEventually(entity: entity, callback: callback)
+    }
+    
+    // ****************************************************************************************
+    
+    public func getLocalCount() {
+        print("DB has \(LocalManager.shared.getNumberOfRecords(tableName, whereClause: nil)) values:")
+        if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
+            for localObject in localObjects {
+                print("🔸\(localObject)")
+            }
+        }
+    }
+    
+    public func checkIfTableExists() {
+        print("Table exists: \(LocalManager.shared.tableExists(tableName))")
+    }
+    
+    public func getTableNames() {
+        print("Local tables: \(LocalManager.shared.getTables())")
+    }
+    
+    public func getTableOperations() {
+        let operations = OfflineSyncManager.shared.uow.operations
+        print("Operations: \(operations.count)")
     }
 }

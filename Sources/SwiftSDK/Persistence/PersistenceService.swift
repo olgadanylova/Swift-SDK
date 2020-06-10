@@ -20,6 +20,10 @@
  */
 
 @objcMembers public class PersistenceService: NSObject {
+    
+    public var dataRetrievalPolicy = RetrievalPolicy.onlineOnly
+    public var localStoragePolicy = LocalStoragePolicy.doNotStoreAny
+    public private(set) var isOfflineAutoSyncEnabled = false
 
     public func ofTable(_ tableName: String) -> MapDrivenDataStore {
         return MapDrivenDataStore(tableName: tableName)
@@ -37,4 +41,23 @@
         let _permissions = DataPermission()
         return _permissions
     }()
+    
+    public func clearLocalDatabase() {        
+        let localTables = LocalManager.shared.getTables()
+        for tableName in localTables {
+            Backendless.shared.data.ofTable(tableName).clearLocalDatabase()
+        }
+    }
+    
+    public func enableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = true
+    }
+    
+    public func disableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = false
+    }
+    
+    public func startOfflineSync(_ callback: SyncCompletionCallback) {
+        //OfflineSyncManager.shared.processAllOperationsSemiAuto(callback)
+    }
 }
