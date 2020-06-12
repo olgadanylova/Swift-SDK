@@ -31,25 +31,23 @@ class OfflineSyncManager {
     var uow: UnitOfWork
     
     private init() {
-        uow = UOWHelper.shared.getUOW()
-        print("***** Sync operations on init: *****")
-        for operation in uow.operations {
-            print("* \(operation.opResultId ?? "")")
-        }
-        print("***********")
-        
+        uow = UOWHelper.shared.getUOW()       
     }
     
     func processAllSyncOperations() {
         if uow.operations.count > 0 {
+            // syncUow is used as a temp variable to prevent loosing local fields in uow operations if the error occurs
+            let syncUow = UnitOfWork()
+            syncUow.operations.removeAll()
             
-            print("***** Sync operations: *****")
             for operation in uow.operations {
-                print("* \(operation.opResultId ?? "")")
-            }
-            print("***********")
-            
-            uow.execute(responseHandler: { uowResult in
+                if var payload = operation.payload as? [String : Any] {
+                    payload = PersistenceLocalHelper.shared.removeAllLocalFields(payload)
+                    operation.payload = payload
+                    syncUow.operations.append(operation)
+                }
+            }            
+            syncUow.execute(responseHandler: { uowResult in
                 if uowResult.isSuccess,
                     let results = uowResult.results {
                     for (opResultId, operationResult) in results {

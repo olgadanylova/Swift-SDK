@@ -57,7 +57,7 @@
         self.isOfflineAutoSyncEnabled = false
     }
     
-    public func startOfflineSync(_ callback: SyncCompletionCallback) {
+    public func startOfflineSync(_ callback: SyncCompletionCallback) {        
         //OfflineSyncManager.shared.processAllOperationsSemiAuto(callback)
     }
 }

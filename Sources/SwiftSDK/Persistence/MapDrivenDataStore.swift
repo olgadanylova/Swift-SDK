@@ -174,20 +174,24 @@
     }
     
     public func removeEventually(entity: [String : Any]) {
-        PersistenceServiceUtilsLocal.shared.removeEventually(entity: entity, callback: nil)
+        PersistenceServiceUtilsLocal.shared.removeEventually(tableName: tableName, entity: entity, callback: nil)
     }
     
     public func removeEventually(entity: [String : Any], callback: OfflineAwareCallback) {
-        PersistenceServiceUtilsLocal.shared.removeEventually(entity: entity, callback: callback)
+        PersistenceServiceUtilsLocal.shared.removeEventually(tableName: tableName, entity: entity, callback: callback)
     }
     
     // ****************************************************************************************
     
     public func getLocalCount() {
         print("DB has \(LocalManager.shared.getNumberOfRecords(tableName, whereClause: nil)) values:")
+    }
+    
+    public func getLocalRecords() {
         if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
+            print("Local objects \(tableName): ")
             for localObject in localObjects {
-                print("🔸\(localObject)")
+                print("🟢 \(localObject)")
             }
         }
     }

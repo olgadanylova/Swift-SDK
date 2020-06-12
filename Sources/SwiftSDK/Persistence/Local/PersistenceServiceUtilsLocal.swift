@@ -87,12 +87,12 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
-    func removeEventually(entity: [String : Any], callback: OfflineAwareCallback?) {
+    func removeEventually(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {
         if ConnectionManager.isConnectedToNetwork() {
-            // removeEventuallyWhenOnline(entity, callback: callback)
+            removeEventuallyWhenOnline(tableName: tableName, entity: entity, callback: callback)
         }
         else {
-            // removeEventuallyWhenOffline(entity, callback: callback)
+            removeEventuallyWhenOffline(tableName: tableName, entity: entity, callback: callback)
         }
     }
     
@@ -214,8 +214,8 @@ class PersistenceServiceUtilsLocal {
                         semaphore.signal()
                     }
                     else if let localObjects = localResult as? [[String : Any]],
-                        let localObject = localObjects.first {
-                        LocalManager.shared.update(tableName: tableName, newValues: localObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        let _ = localObjects.first {
+                        LocalManager.shared.update(tableName: tableName, newValues: responseObject, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                         semaphore.signal()
                     }
                 }, errorHandler: { fault in
@@ -228,11 +228,10 @@ class PersistenceServiceUtilsLocal {
         return
     }
     
-    private func saveEventuallyWhenOffline(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {
+    private func saveEventuallyWhenOffline(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {        
         let objectId = entity["objectId"] as? String
         let blLocalId = entity["blLocalId"] as? NSNumber
         let wrappedResponseHandler = self.wrapLocalHandlerWhenOffline(tableName: tableName, localResponseHandler: callback?.localResponseHandler, callback: callback)
-        
         // save locally
         if objectId == nil, blLocalId == nil {
             LocalManager.shared.insert(tableName: tableName, object: entity, blPendingOperation: .create, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
@@ -284,6 +283,124 @@ class PersistenceServiceUtilsLocal {
         }
     }
     
+    private func removeEventuallyWhenOnline(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {
+        let semaphore = DispatchSemaphore(value: 0)
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = self.wrapLocalHandlerWhenOnline(callback?.localResponseHandler, callback: callback)
+        
+        // if record exists locally and objectId != nil: remove remotely - remove locally
+        // if record exists locally and objectId == nil: remove locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+                semaphore.signal()
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                let localObject = localObjects.first {
+                if let objId = localObject["objectId"] as? String {
+                    DispatchQueue.global().async {
+                        PersistenceServiceUtils(tableName: tableName).removeById(objectId: objId, responseHandler: { response in
+                            callback?.remoteResponseHandler?(response)
+                            LocalManager.shared.delete(tableName: tableName,whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                            semaphore.signal()
+                        }, errorHandler: { fault in
+                            callback?.remoteErrorHandler?(fault)
+                            semaphore.signal()
+                        })
+                    }
+                }
+                else {
+                    LocalManager.shared.delete(tableName: tableName, whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                    semaphore.signal()
+                }
+            }
+        }
+            
+            // remove remotely
+            // if record exists locally: remove locally
+        else if objectId != nil, blLocalId == nil {
+            DispatchQueue.global().async {
+                PersistenceServiceUtils(tableName: tableName).removeById(objectId: objectId!, responseHandler: { response in
+                    callback?.remoteResponseHandler?(response)
+                    let whereClause = "objectId='\(objectId!)'"
+                    let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        LocalManager.shared.delete(tableName: tableName, whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+        else if objectId != nil, blLocalId != nil {
+            DispatchQueue.global().async {
+                PersistenceServiceUtils(tableName: tableName).removeById(objectId: objectId!, responseHandler: { response in
+                    callback?.remoteResponseHandler?(response)
+                    let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+                    let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
+                    if let fault = localResult as? Fault {
+                        callback?.localErrorHandler?(fault)
+                        semaphore.signal()
+                    }
+                    else if localResult is [[String : Any]] {
+                        LocalManager.shared.delete(tableName: tableName, whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+                        semaphore.signal()
+                    }
+                }, errorHandler: { fault in
+                    callback?.remoteErrorHandler?(fault)
+                    semaphore.signal()
+                })
+            }
+        }
+        semaphore.wait()
+        return
+    }
+    
+    private func removeEventuallyWhenOffline(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {
+        let objectId = entity["objectId"] as? String
+        let blLocalId = entity["blLocalId"] as? NSNumber
+        let wrappedResponseHandler = wrapLocalHandlerWhenOffline(tableName: tableName, localResponseHandler: callback?.localResponseHandler, callback: callback)
+        
+        // if record exists locally: remove locally
+        if objectId == nil, blLocalId != nil {
+            let whereClause = "blLocalId=\(blLocalId!)"
+            LocalManager.shared.delete(tableName: tableName, whereClause: whereClause, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+        }
+            // if record exists locally: update with BlPendingOperation = .delete
+        else if objectId != nil, blLocalId == nil {
+            let whereClause = "objectId='\(objectId!)'"
+            let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                localObjects.first != nil {
+                LocalManager.shared.update(tableName: tableName, newValues: entity, whereClause: whereClause, blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+        }
+            // if record exists locally: update with BlPendingOperation = .delete
+        else if objectId != nil, blLocalId != nil {
+            let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
+            let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
+            if let fault = localResult as? Fault {
+                callback?.localErrorHandler?(fault)
+            }
+            else if let localObjects = localResult as? [[String : Any]],
+                localObjects.first != nil {
+                LocalManager.shared.update(tableName: tableName, newValues: entity, whereClause: whereClause, blPendingOperation: .delete, localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
+            }
+        }
+    }
+    
     private func wrapLocalHandlerWhenOnline(_ localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
             if let responseDict = response as? [String : Any] {
@@ -295,34 +412,97 @@ class PersistenceServiceUtilsLocal {
     
     private func wrapLocalHandlerWhenOffline(tableName: String, localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
-            if let responseDictForOffline = response as? [String : Any] {
+            if var responseDictForOffline = response as? [String : Any] {         
                 if !ConnectionManager.isConnectedToNetwork() {
                     if let blPendingOperation = responseDictForOffline["blPendingOperation"] as? NSNumber,
                         let blLocalId = responseDictForOffline["blLocalId"] as? NSNumber {
+                        var operations = OfflineSyncManager.shared.uow.operations
                         if blPendingOperation == 0 {
-                            // remove blLocalId, blLocalTimestamp, blPendingOperation
-                            // OfflineSyncManager.shared.uow.create
-                            let createResult = OfflineSyncManager.shared.uow.create(tableName: tableName, objectToSave: PersistenceLocalHelper.shared.removeAllLocalFields(responseDictForOffline))
-                            createResult.opResultId = "create\(tableName)\(blLocalId)"
-                            
-                            print("***** ⚠️Sync operations: *****")
-                            for operation in OfflineSyncManager.shared.uow.operations {
-                                print("* \(operation.opResultId ?? "")")
-                            }
-                            print("***********")
-                            
-                            
+                            let createResult = OfflineSyncManager.shared.uow.create(tableName: tableName, objectToSave: responseDictForOffline)
+                            createResult.opResultId = "create\(tableName)\(blLocalId)"                    
                             OfflineSyncManager.shared.offlineAwareCallbacks[createResult.opResultId!] = callback
                             OfflineSyncManager.shared.opResultIdToBlLocalId[createResult.opResultId!] = blLocalId
                         }
                         else if blPendingOperation == 1 {
-                            // remove blLocalId, blLocalTimestamp, blPendingOperation
-                            // OfflineSyncManager.shared.uow.update
+                            if operations.count > 0 {
+                                for i in 0..<operations.count {
+                                    let operation = operations[i]
+                                    if operation.tableName == tableName,
+                                        var payload = operation.payload as? [String : Any],
+                                        payload["blLocalId"] as? NSNumber == blLocalId {
+                                        if payload["objectId"] == nil {
+                                            responseDictForOffline["blPendingOperation"] = 0
+                                            operation.payload = responseDictForOffline
+                                            operation.operationType = .CREATE
+                                            operations[i] = operation
+                                        }
+                                        else {
+                                            for (key, value) in responseDictForOffline {
+                                                payload[key] = value
+                                            }
+                                            operation.payload = payload
+                                            operation.operationType = .UPDATE
+                                            operations[i] = operation
+                                        }
+                                    }
+                                    else {
+                                        let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: responseDictForOffline)
+                                        updateResult.opResultId = "update\(tableName)\(blLocalId)"
+                                        OfflineSyncManager.shared.offlineAwareCallbacks[updateResult.opResultId!] = callback
+                                        OfflineSyncManager.shared.opResultIdToBlLocalId[updateResult.opResultId!] = blLocalId
+                                    }
+                                }
+                                OfflineSyncManager.shared.uow.operations = operations
+                            }
+                            else {
+                                let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: responseDictForOffline)
+                                updateResult.opResultId = "update\(tableName)\(blLocalId)"
+                                OfflineSyncManager.shared.offlineAwareCallbacks[updateResult.opResultId!] = callback
+                                OfflineSyncManager.shared.opResultIdToBlLocalId[updateResult.opResultId!] = blLocalId
+                            }
                         }
                         else if blPendingOperation == 2 {
                             // OfflineSyncManager.shared.uow.delete
+                            if operations.count > 0 {
+                                var operationsToRemove = [Int]()
+                                for i in 0..<operations.count {
+                                    let operation = operations[i]
+                                    if operation.tableName == tableName,
+                                        let payload = operation.payload as? [String : Any],
+                                        payload["blLocalId"] as? NSNumber == blLocalId {
+                                        if payload["objectId"] == nil {
+                                            operationsToRemove.append(i)
+                                        }
+                                        else if let objectId = payload["objectId"] as? String {
+                                            let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
+                                            deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
+                                            OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
+                                            OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
+                                        }
+                                    }
+                                    else if let payload = operation.payload as? [String : Any],
+                                        let objectId = payload["objectId"] as? String {
+                                        let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
+                                        deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
+                                        OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
+                                        OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
+                                    }
+                                }
+                                
+                                // operations remove at operationsToRemove
+                                OfflineSyncManager.shared.uow.operations = operations
+                                    .enumerated()
+                                    .filter { !operationsToRemove.contains($0.offset) }
+                                    .map { $0.element }
+                            }
+                            else if let objectId = responseDictForOffline["objectId"] as? String {
+                                let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
+                                deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
+                                OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
+                                OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
+                            }
                         }
-                    }
+                    }                    
                     UOWHelper.shared.saveUOW(OfflineSyncManager.shared.uow)
                 }
                 let responseDict = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(responseDictForOffline)
