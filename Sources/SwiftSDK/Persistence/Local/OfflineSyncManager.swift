@@ -46,7 +46,7 @@ class OfflineSyncManager {
                     operation.payload = payload
                     syncUow.operations.append(operation)
                 }
-            }            
+            }
             syncUow.execute(responseHandler: { uowResult in
                 if uowResult.isSuccess,
                     let results = uowResult.results {
@@ -67,7 +67,8 @@ class OfflineSyncManager {
                                     let onRemoveCallback = self.onRemoveCallbacks[tableName]
                                     callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
                                 }
-                                // TODO RemoveEventually
+                                result["blLocalId"] = self.opResultIdToBlLocalId[opResultId]
+                                PersistenceServiceUtilsLocal.shared.removeEventually(tableName: tableName, entity: result, callback: callback)
                             }
                         }
                     }
