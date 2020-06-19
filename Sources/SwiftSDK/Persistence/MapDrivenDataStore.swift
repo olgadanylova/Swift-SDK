@@ -183,29 +183,30 @@
     
     // ****************************************************************************************
     
-    public func getLocalCount() {
-        print("DB has \(LocalManager.shared.getNumberOfRecords(tableName, whereClause: nil)) values:")
+    public func getLocalCount() -> NSNumber {
+        let count = LocalManager.shared.getNumberOfRecords(tableName, whereClause: "blPendingOperation!=2")
+        if count is NSNumber {
+            return count as! NSNumber
+        }
+        return 0
     }
     
-    public func getLocalRecords() {
+    public func getLocalRecords() -> [[String : Any]] {
         if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
-            print("Local objects \(tableName): ")
-            for localObject in localObjects {
-                print("🟢 \(localObject)")
-            }
+            return localObjects
         }
+        return [[String : Any]]()
     }
     
     public func checkIfTableExists() {
-        print("Table exists: \(LocalManager.shared.tableExists(tableName))")
+        print("Table \(tableName) exists: \(LocalManager.shared.tableExists(tableName))")
     }
     
     public func getTableNames() {
-        print("Local tables: \(LocalManager.shared.getTables())")
+        print("All local tables: \(LocalManager.shared.getTables())")
     }
     
-    public func getTableOperations() {
-        let operations = OfflineSyncManager.shared.uow.operations
-        print("Operations: \(operations.count)")
+    public func getTableOperationsCount() -> Int {
+        return OfflineSyncManager.shared.uow.operations.count
     }
 }

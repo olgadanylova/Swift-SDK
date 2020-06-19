@@ -183,13 +183,13 @@ class LocalManager {
     }
     
     func delete(tableName: String, whereClause: String, localResponseHandler: ((Any) -> Void)?, localErrorHandler: ((Fault) -> Void)?) {
-        let result = select(tableName: tableName, whereClause: whereClause)
+        let result = selectWithDeleted(tableName: tableName, whereClause: whereClause)
         if result is [[String : Any]],
             let deletedObject = (result as! [[String : Any]]).first {
             let cmd = "DELETE FROM \(tableName) WHERE \(parseWhereClauseWithGrammar(whereClause))"
             var statement: OpaquePointer?
             if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
-                localResponseHandler?(deletedObject)
+                localResponseHandler?(PersistenceLocalHelper.shared.removeAllLocalFields(deletedObject))
             }
             else {
                 let errorMessage = String.init(cString: sqlite3_errmsg(dbInstance))
@@ -209,6 +209,10 @@ class LocalManager {
     
     func select(tableName: String, whereClause: String) -> Any {
         return select(tableName: tableName, withDeleted: false, properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
+    }
+    
+    func selectWithDeleted(tableName: String, whereClause: String) -> Any {
+        return select(tableName: tableName, withDeleted: true, properties: nil, whereClause: whereClause, limit: nil, offset: nil, orderBy: nil, groupBy: nil, having: nil)
     }
     
     func select(tableName: String, withDeleted: Bool, properties: [String]?, whereClause: String?, limit: Int?, offset: Int?, orderBy: [String]?, groupBy: [String]?, having: String?) -> Any {
