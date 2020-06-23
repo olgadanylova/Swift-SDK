@@ -384,7 +384,6 @@ class PersistenceServiceUtilsLocal {
         
         // if record exists locally: remove locally
         if objectId == nil, blLocalId != nil {
-            print("1")
             let whereClause = "blLocalId=\(blLocalId!)"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -397,7 +396,6 @@ class PersistenceServiceUtilsLocal {
         }
             // if record exists locally: update with BlPendingOperation = .delete
         else if objectId != nil, blLocalId == nil {
-            print("2")
             let whereClause = "objectId='\(objectId!)'"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -410,7 +408,6 @@ class PersistenceServiceUtilsLocal {
         }
             // if record exists locally: update with BlPendingOperation = .delete
         else if objectId != nil, blLocalId != nil {
-            print("3")
             let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -441,12 +438,9 @@ class PersistenceServiceUtilsLocal {
                         if blPendingOperation == 0 {
                             let createResult = OfflineSyncManager.shared.uow.create(tableName: tableName, objectToSave: responseDictForOffline)
                             createResult.opResultId = "create\(tableName)\(blLocalId)"
-                            OfflineSyncManager.shared.opResults[createResult.opResultId!] = createResult
                             OfflineSyncManager.shared.offlineAwareCallbacks[createResult.opResultId!] = callback
                             OfflineSyncManager.shared.opResultIdToBlLocalId[createResult.opResultId!] = blLocalId
                         }
-                            
-                        // *****************************************************
                         else if blPendingOperation == 1 {
                             let operations = OfflineSyncManager.shared.uow.operations
                             if operations.contains(where: { $0.tableName == tableName &&
@@ -499,14 +493,11 @@ class PersistenceServiceUtilsLocal {
                                 }
                             }
                         }
-                        
-                        // *****************************************************
                         else if blPendingOperation == 2 {
                             let operations = OfflineSyncManager.shared.uow.operations
                             var removeOperations = [Int]()
                             if operations.contains(where: { $0.tableName == tableName &&
                             ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
-                                print("HERE1")
                                 for i in 0..<operations.count {
                                     let operation = operations[i]
                                     if operation.tableName == tableName,
@@ -534,20 +525,9 @@ class PersistenceServiceUtilsLocal {
                                 .map { $0.element }
                             }
                             else {
-                                // походу тут нужный нам объект уже с blPendingOperation = 2
-                                // нужно просто создать операцию для транзакции
-                                print("HERE2")
-                                print(LocalManager.shared.selectWithDeleted(tableName: tableName, whereClause: ""))
-                                
-                                
-                                if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
-                                    print("----------------------")
-                                    for localObject in localObjects {
-                                        print(localObject)
-                                    }
-                                    print("----------------------")
-                                    /*if let objectId = localObject["objectId"] as? String {
-                                        LocalManager.shared.update(tableName: tableName, newValues: localObject, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .delete, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
+                                if let localObjects = LocalManager.shared.selectWithDeleted(tableName: tableName, whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]],
+                                    let localObject = localObjects.first {
+                                    if let objectId = localObject["objectId"] as? String {
                                         let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
                                         deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
                                         OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
@@ -556,7 +536,7 @@ class PersistenceServiceUtilsLocal {
                                     }
                                     else {
                                         // its not a normal situation, do nothing here
-                                    }*/
+                                    }
                                 }
                             }
                         }

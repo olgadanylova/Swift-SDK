@@ -27,7 +27,6 @@ class OfflineSyncManager {
     var offlineAwareCallbacks = [String : OfflineAwareCallback]()
     var opResultIdToBlLocalId = [String : NSNumber]()
     var operationTableNames = [String : String]()
-    var opResults = [String : OpResult]()
     var onSaveCallbacks = [String : OnSave]()
     var onRemoveCallbacks = [String : OnRemove]()
     var uow: UnitOfWork
