@@ -27,6 +27,7 @@ class OfflineSyncManager {
     var offlineAwareCallbacks = [String : OfflineAwareCallback]()
     var opResultIdToBlLocalId = [String : NSNumber]()
     var operationTableNames = [String : String]()
+    var opResults = [String : OpResult]()
     var onSaveCallbacks = [String : OnSave]()
     var onRemoveCallbacks = [String : OnRemove]()
     var uow: UnitOfWork
@@ -51,6 +52,13 @@ class OfflineSyncManager {
                     syncUow.operations.append(operation)
                 }
             }
+            
+            print("Sync operations:")
+            for operation in syncUow.operations {
+                print("    * \(operation.opResultId!): \(operation.payload!)")
+            }
+            print("****************")
+            
             syncUow.execute(responseHandler: { uowResult in
                 if uowResult.isSuccess,
                     let results = uowResult.results {
@@ -66,20 +74,35 @@ class OfflineSyncManager {
                             result["blLocalId"] = self.opResultIdToBlLocalId[opResultId]
                             PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: result, callback: callback)
                         }
-                        else if opResultId.contains("delete"),
-                            let tableName = self.operationTableNames[opResultId] {
+                            // *************************************
+                            
+                        else if opResultId.contains("delete") {
+                            var tableName = self.operationTableNames[opResultId]
+                            if tableName == nil {
+                                tableName = UOWHelper.shared.getOperationTables()[opResultId]
+                            }
+                            var blLocalId = self.opResultIdToBlLocalId[opResultId]
+                            if blLocalId == nil {
+                                blLocalId = UOWHelper.shared.getOperationBlLocalIds()[opResultId]
+                            }
                             var callback = self.offlineAwareCallbacks[opResultId]
                             if callback == nil {
-                                let onRemoveCallback = self.onRemoveCallbacks[tableName]
+                                let onRemoveCallback = self.onRemoveCallbacks[tableName!]
                                 callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
                             }
-                            if let blLocalId = self.opResultIdToBlLocalId[opResultId] {
-                                LocalManager.shared.delete(tableName: tableName, whereClause: "blLocalId=\(blLocalId)", localResponseHandler: callback?.remoteResponseHandler, localErrorHandler: callback?.remoteErrorHandler)
+                            if tableName != nil, blLocalId != nil {
+                                LocalManager.shared.delete(tableName: tableName!, whereClause: "blLocalId=\(blLocalId!)", localResponseHandler: callback?.remoteResponseHandler, localErrorHandler: callback?.remoteErrorHandler)
                             }
                         }
                     }
                     self.uow.operations.removeAll()
                     UOWHelper.shared.saveUOW(self.uow)
+                    
+                    self.operationTableNames.removeAll()
+                    UOWHelper.shared.saveOperationTables()
+                    
+                    self.opResultIdToBlLocalId.removeAll()
+                    UOWHelper.shared.saveBlLocalIds()
                 }
                 else if let uowError = uowResult.error,
                     let failedOperation = uowError.operation,

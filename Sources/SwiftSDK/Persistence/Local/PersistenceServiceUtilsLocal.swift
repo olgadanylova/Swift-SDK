@@ -74,7 +74,19 @@ class PersistenceServiceUtilsLocal {
         if LocalManager.shared.tableExists(tableName) {
             LocalManager.shared.dropTable(tableName)
             OfflineSyncManager.shared.uow.operations.removeAll(where: { $0.tableName == tableName })
-            UOWHelper.shared.saveUOW(OfflineSyncManager.shared.uow)
+            UOWHelper.shared.saveUOW(OfflineSyncManager.shared.uow)            
+            var opResultIdsToRemove = [String]()
+            for (opResultId, opTableName) in OfflineSyncManager.shared.operationTableNames {
+                if opTableName == tableName {
+                    opResultIdsToRemove.append(opResultId)
+                }
+            }
+            for opResultIdToRemove in opResultIdsToRemove {
+                OfflineSyncManager.shared.operationTableNames.removeValue(forKey: opResultIdToRemove)
+                OfflineSyncManager.shared.opResultIdToBlLocalId.removeValue(forKey: opResultIdToRemove)
+            }
+            UOWHelper.shared.saveOperationTables()
+            UOWHelper.shared.saveBlLocalIds()
         }
     }
     
@@ -372,6 +384,7 @@ class PersistenceServiceUtilsLocal {
         
         // if record exists locally: remove locally
         if objectId == nil, blLocalId != nil {
+            print("1")
             let whereClause = "blLocalId=\(blLocalId!)"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -384,6 +397,7 @@ class PersistenceServiceUtilsLocal {
         }
             // if record exists locally: update with BlPendingOperation = .delete
         else if objectId != nil, blLocalId == nil {
+            print("2")
             let whereClause = "objectId='\(objectId!)'"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -396,6 +410,7 @@ class PersistenceServiceUtilsLocal {
         }
             // if record exists locally: update with BlPendingOperation = .delete
         else if objectId != nil, blLocalId != nil {
+            print("3")
             let whereClause = "objectId='\(objectId!)' AND blLocalId=\(blLocalId!)"
             let localResult = LocalManager.shared.select(tableName: tableName, whereClause: whereClause)
             if let fault = localResult as? Fault {
@@ -419,99 +434,136 @@ class PersistenceServiceUtilsLocal {
     
     private func wrapLocalHandlerWhenOffline(tableName: String, localResponseHandler: ((Any) -> Void)?, callback: OfflineAwareCallback?) -> ((Any) -> Void) {
         let wrappedHandler: (Any) -> () = { response in
-            if var responseDictForOffline = response as? [String : Any] {
+            if let responseDictForOffline = response as? [String : Any] {
                 if !ConnectionManager.isConnectedToNetwork() {
                     if let blPendingOperation = responseDictForOffline["blPendingOperation"] as? NSNumber,
                         let blLocalId = responseDictForOffline["blLocalId"] as? NSNumber {
-                        var operations = OfflineSyncManager.shared.uow.operations
                         if blPendingOperation == 0 {
                             let createResult = OfflineSyncManager.shared.uow.create(tableName: tableName, objectToSave: responseDictForOffline)
-                            createResult.opResultId = "create\(tableName)\(blLocalId)"                    
+                            createResult.opResultId = "create\(tableName)\(blLocalId)"
+                            OfflineSyncManager.shared.opResults[createResult.opResultId!] = createResult
                             OfflineSyncManager.shared.offlineAwareCallbacks[createResult.opResultId!] = callback
                             OfflineSyncManager.shared.opResultIdToBlLocalId[createResult.opResultId!] = blLocalId
                         }
+                            
+                        // *****************************************************
                         else if blPendingOperation == 1 {
-                            if operations.count > 0 {
-                                for i in 0..<operations.count {
-                                    let operation = operations[i]
+                            let operations = OfflineSyncManager.shared.uow.operations
+                            if operations.contains(where: { $0.tableName == tableName &&
+                            ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
+                                for operation in operations {
                                     if operation.tableName == tableName,
                                         var payload = operation.payload as? [String : Any],
-                                        payload["blLocalId"] as? NSNumber == blLocalId {
-                                        if payload["objectId"] == nil {
-                                            responseDictForOffline["blPendingOperation"] = 0
-                                            operation.payload = responseDictForOffline
-                                            operation.operationType = .CREATE
-                                            operations[i] = operation
+                                        let payloadLocalId = payload["blLocalId"] as? NSNumber,
+                                        payloadLocalId == blLocalId {
+                                        if payload["objectId"] as? String != nil {
+                                            for (key, value) in responseDictForOffline {
+                                                if key != "objectId" {
+                                                    payload[key] = value
+                                                }
+                                                operation.payload = payload
+                                                LocalManager.shared.update(tableName: tableName, newValues: payload, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .create, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
+                                                let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: payload)
+                                                updateResult.opResultId = "update\(tableName)\(blLocalId)"
+                                                OfflineSyncManager.shared.offlineAwareCallbacks[updateResult.opResultId!] = callback
+                                                OfflineSyncManager.shared.opResultIdToBlLocalId[updateResult.opResultId!] = blLocalId
+                                            }
                                         }
                                         else {
-                                            for (key, value) in responseDictForOffline {
-                                                payload[key] = value
-                                            }
+                                            payload = responseDictForOffline
                                             operation.payload = payload
-                                            operation.operationType = .UPDATE
-                                            operations[i] = operation
+                                            LocalManager.shared.update(tableName: tableName, newValues: payload, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .create, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
                                         }
                                     }
-                                    else {
-                                        let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: responseDictForOffline)
+                                    OfflineSyncManager.shared.uow.operations = operations
+                                }
+                            }
+                            else {
+                                if let localObjects = LocalManager.shared.select(tableName: tableName, whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]],
+                                    var localObject = localObjects.first {
+                                    if let objectId = localObject["objectId"] as? String {
+                                        for (key, value) in responseDictForOffline {
+                                            if key != objectId {
+                                                localObject[key] = value
+                                            }
+                                        }
+                                        LocalManager.shared.update(tableName: tableName, newValues: localObject, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .update, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
+                                        let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: localObject)
                                         updateResult.opResultId = "update\(tableName)\(blLocalId)"
                                         OfflineSyncManager.shared.offlineAwareCallbacks[updateResult.opResultId!] = callback
                                         OfflineSyncManager.shared.opResultIdToBlLocalId[updateResult.opResultId!] = blLocalId
                                     }
+                                    else {
+                                        // its not a normal situation, do nothing here
+                                    }
                                 }
-                                OfflineSyncManager.shared.uow.operations = operations
-                            }
-                            else {
-                                let updateResult = OfflineSyncManager.shared.uow.update(tableName: tableName, objectToSave: responseDictForOffline)
-                                updateResult.opResultId = "update\(tableName)\(blLocalId)"
-                                OfflineSyncManager.shared.offlineAwareCallbacks[updateResult.opResultId!] = callback
-                                OfflineSyncManager.shared.opResultIdToBlLocalId[updateResult.opResultId!] = blLocalId
                             }
                         }
+                        
+                        // *****************************************************
                         else if blPendingOperation == 2 {
-                            if operations.count > 0 {
-                                var operationsToRemove = [Int]()
+                            let operations = OfflineSyncManager.shared.uow.operations
+                            var removeOperations = [Int]()
+                            if operations.contains(where: { $0.tableName == tableName &&
+                            ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
+                                print("HERE1")
                                 for i in 0..<operations.count {
                                     let operation = operations[i]
                                     if operation.tableName == tableName,
-                                        let payload = operation.payload as? [String : Any],
-                                        payload["blLocalId"] as? NSNumber == blLocalId {
-                                        if payload["objectId"] == nil {
-                                            operationsToRemove.append(i)
-                                        }
-                                        else if let objectId = payload["objectId"] as? String {
+                                    let payload = operation.payload as? [String : Any],
+                                    let payloadLocalId = payload["blLocalId"] as? NSNumber,
+                                    payloadLocalId == blLocalId {
+                                        if let objectId = payload["objectId"] as? String {
+                                            removeOperations.append(i)
+                                            LocalManager.shared.update(tableName: tableName, newValues: payload, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .delete, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
                                             let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
                                             deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
                                             OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
                                             OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
+                                            OfflineSyncManager.shared.operationTableNames[deleteResult.opResultId!] = tableName
+                                        }
+                                        else {
+                                            removeOperations.append(i)
+                                            LocalManager.shared.delete(tableName: tableName, whereClause: "blLocalId=\(blLocalId)", localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
                                         }
                                     }
-                                    else if let payload = operation.payload as? [String : Any],
-                                        let objectId = payload["objectId"] as? String {
+                                }
+                                OfflineSyncManager.shared.uow.operations = OfflineSyncManager.shared.uow.operations
+                                .enumerated()
+                                .filter { !removeOperations.contains($0.offset) }
+                                .map { $0.element }
+                            }
+                            else {
+                                // походу тут нужный нам объект уже с blPendingOperation = 2
+                                // нужно просто создать операцию для транзакции
+                                print("HERE2")
+                                print(LocalManager.shared.selectWithDeleted(tableName: tableName, whereClause: ""))
+                                
+                                
+                                if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
+                                    print("----------------------")
+                                    for localObject in localObjects {
+                                        print(localObject)
+                                    }
+                                    print("----------------------")
+                                    /*if let objectId = localObject["objectId"] as? String {
+                                        LocalManager.shared.update(tableName: tableName, newValues: localObject, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .delete, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
                                         let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
                                         deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
-                                        OfflineSyncManager.shared.operationTableNames[deleteResult.opResultId!] = tableName
                                         OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
                                         OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
+                                        OfflineSyncManager.shared.operationTableNames[deleteResult.opResultId!] = tableName
                                     }
+                                    else {
+                                        // its not a normal situation, do nothing here
+                                    }*/
                                 }
-                                
-                                // operations remove at operationsToRemove
-                                OfflineSyncManager.shared.uow.operations = operations
-                                    .enumerated()
-                                    .filter { !operationsToRemove.contains($0.offset) }
-                                    .map { $0.element }
-                            }
-                            else if let objectId = responseDictForOffline["objectId"] as? String {
-                                let deleteResult = OfflineSyncManager.shared.uow.delete(tableName: tableName, objectId: objectId)
-                                deleteResult.opResultId = "delete\(tableName)\(blLocalId)"
-                                OfflineSyncManager.shared.operationTableNames[deleteResult.opResultId!] = tableName
-                                OfflineSyncManager.shared.offlineAwareCallbacks[deleteResult.opResultId!] = callback
-                                OfflineSyncManager.shared.opResultIdToBlLocalId[deleteResult.opResultId!] = blLocalId
                             }
                         }
                     }
                     UOWHelper.shared.saveUOW(OfflineSyncManager.shared.uow)
+                    UOWHelper.shared.saveOperationTables()
+                    UOWHelper.shared.saveBlLocalIds()
                 }
                 let responseDict = PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(responseDictForOffline)
                 localResponseHandler?(PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(responseDict))

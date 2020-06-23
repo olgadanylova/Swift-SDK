@@ -24,6 +24,8 @@ class UOWHelper {
     static let shared = UOWHelper()
     
     private let uowOfflineKey = "uow-offline"
+    private let uowOperationTablesOfflineKey = "uow-operation-tables-offline"
+    private let uowOperationBlLocalIdOfflineKey = "uow-operation-blLocalId-offline"
     
     private init() { }
     
@@ -64,5 +66,35 @@ class UOWHelper {
     
     func removeUOW() {
         UserDefaults.standard.removeObject(forKey: uowOfflineKey)
+    }
+    
+    func saveOperationTables() {
+        UserDefaults.standard.setValue(OfflineSyncManager.shared.operationTableNames, forKey: uowOperationTablesOfflineKey)
+    }
+    
+    func getOperationTables() -> [String : String] {
+        if let operationTables = UserDefaults.standard.value(forKey: uowOperationTablesOfflineKey) as? [String : String] {
+            return operationTables
+        }
+        return [String : String]()
+    }
+    
+    func removeOperationTables() {
+        UserDefaults.standard.removeObject(forKey: uowOperationTablesOfflineKey)
+    }
+    
+    func saveBlLocalIds() {
+        UserDefaults.standard.setValue(OfflineSyncManager.shared.opResultIdToBlLocalId, forKey: uowOperationBlLocalIdOfflineKey)
+    }
+    
+    func getOperationBlLocalIds() -> [String : NSNumber] {
+        if let blLocalIds = UserDefaults.standard.value(forKey: uowOperationBlLocalIdOfflineKey) as? [String : NSNumber] {
+            return blLocalIds
+        }
+        return [String : NSNumber]()
+    }
+    
+    func removeOperationBlLocalIds() {
+        UserDefaults.standard.removeObject(forKey: uowOperationBlLocalIdOfflineKey)
     }
 }
