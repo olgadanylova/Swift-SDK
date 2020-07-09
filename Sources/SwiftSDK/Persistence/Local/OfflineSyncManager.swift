@@ -57,7 +57,7 @@ class OfflineSyncManager {
                 print("    * \(operation.opResultId!): \(operation.payload!)")
             }
             print("****************")
-            
+                
             syncUow.execute(responseHandler: { uowResult in
                 if uowResult.isSuccess,
                     let results = uowResult.results {
@@ -70,7 +70,7 @@ class OfflineSyncManager {
                                 let onSaveCallback = self.onSaveCallbacks[tableName]
                                 callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
                             }
-                            result["blLocalId"] = self.opResultIdToBlLocalId[opResultId]
+                            result["blLocalId"] = self.opResultIdToBlLocalId[opResultId]                            
                             PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: result, callback: callback)
                         }
                             // *************************************

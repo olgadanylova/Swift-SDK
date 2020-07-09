@@ -91,6 +91,10 @@ class PersistenceServiceUtilsLocal {
     }
     
     func saveEventually(tableName: String, entity: [String : Any], callback: OfflineAwareCallback?) {
+        var entity = entity        
+        for (key, value) in entity {
+            entity[key] = JSONUtils.shared.objectToJson(objectToParse: value)
+        }
         if ConnectionManager.isConnectedToNetwork() {
             saveEventuallyWhenOnline(tableName: tableName, entity: entity, callback: callback)
         }
@@ -467,6 +471,8 @@ class PersistenceServiceUtilsLocal {
                                             payload = responseDictForOffline
                                             operation.payload = payload
                                             LocalManager.shared.update(tableName: tableName, newValues: payload, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .create, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
+                                            OfflineSyncManager.shared.offlineAwareCallbacks[operation.opResultId!] = callback
+                                            OfflineSyncManager.shared.opResultIdToBlLocalId[operation.opResultId!] = blLocalId
                                         }
                                     }
                                     OfflineSyncManager.shared.uow.operations = operations

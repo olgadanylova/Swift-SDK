@@ -104,4 +104,20 @@ class JSONUtils {
         }        
         return resultObject
     }
+    
+    func dictionaryToJsonString(_ dictionary: [String : Any]) -> String? {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: dictionary, options: []),
+            let jsonString = String(data: jsonData, encoding: .ascii) {
+            return jsonString
+        }
+        return nil
+    }
+    
+    func arrayToJsonString(_ array: [[String : Any]]) -> String? {
+        if let jsonData = try? JSONSerialization.data(withJSONObject: array, options: []),
+            let jsonString = String(data: jsonData, encoding: .ascii) {
+            return jsonString
+        }
+        return nil
+    }
 }

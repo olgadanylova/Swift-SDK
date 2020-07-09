@@ -149,6 +149,14 @@ class LocalManager {
                 if value is String {
                     valuesString += "\(key) = '\(value)', "
                 }
+                else if value is [String : Any],
+                    let jsonString = JSONUtils.shared.dictionaryToJsonString(value as! [String : Any]) {
+                    valuesString += "\(key) = '\(jsonString)', "
+                }
+                else if value is [[String : Any]],
+                    let jsonString = JSONUtils.shared.arrayToJsonString(value as! [[String : Any]]) {
+                    valuesString += "\(key) = '\(jsonString)', "
+                }
                 else if !(value is NSNull) {
                     valuesString += "\(key) = \(value), "
                 }
@@ -356,11 +364,9 @@ class LocalManager {
         if value is NSInteger {
             fieldType = "INTEGER"
         }
-        else if value is String {
+        else if value is String || value is BLGeometry ||
+            value is [String : Any] || value is [[String : Any]] {
             fieldType = "TEXT"
-        }
-        else if value is BLGeometry {
-            fieldType = "STRING"
         }
         return fieldType
     }
@@ -399,7 +405,6 @@ class LocalManager {
             cmd += ", \(created)"
         }
         else {
-            //cmd += ", null"
             cmd += ", \(blLocalTimestamp)"
         }
         if let updated = object["updated"] as? NSNumber {
@@ -426,6 +431,29 @@ class LocalManager {
                 }
                 else if value is String {
                     cmd += ", '\(value)'"
+                }
+                else if value is [String : Any],
+                    let jsonString = JSONUtils.shared.dictionaryToJsonString(value as! [String : Any]) {
+                    cmd += ", '\(jsonString)'"
+                }
+                else if value is [[String : Any]],
+                    let jsonString = JSONUtils.shared.arrayToJsonString(value as! [[String : Any]]) {
+                    cmd += ", '\(jsonString)'"
+                }
+                else if value is NSObject {
+                    let dictObject = PersistenceHelper.shared.entityToDictionary(entity: value)
+                    if let jsonString = JSONUtils.shared.dictionaryToJsonString(dictObject) {
+                        cmd += ", '\(jsonString)'"
+                    }
+                }
+                else if value is [NSObject] {
+                    var array = [[String : Any]]()
+                    for object in value as! [NSObject] {
+                        array.append(PersistenceHelper.shared.entityToDictionary(entity: object))
+                    }
+                    if let jsonString = JSONUtils.shared.arrayToJsonString(array) {
+                        cmd += ", '\(jsonString)'"
+                    }
                 }
                 else {
                     cmd += ", \(value)"
