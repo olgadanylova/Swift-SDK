@@ -25,8 +25,6 @@ class OfflineSyncManager {
     
     var dontSyncTables = [String]()
     var offlineAwareCallbacks = [String : OfflineAwareCallback]()
-    var opResultIdToBlLocalId = [String : NSNumber]()
-    var operationTableNames = [String : String]()
     var onSaveCallbacks = [String : OnSave]()
     var onRemoveCallbacks = [String : OnRemove]()
     var uow: UnitOfWork
@@ -62,6 +60,7 @@ class OfflineSyncManager {
                 if uowResult.isSuccess,
                     let results = uowResult.results {
                     for (opResultId, operationResult) in results {
+                        let blLocalIds = UOWHelper.shared.getOperationBlLocalIds()                        
                         if var result = operationResult.result as? [String : Any],
                             let tableName = result["___class"] as? String,
                             (opResultId.contains("create") || opResultId.contains("update")) {
@@ -70,38 +69,27 @@ class OfflineSyncManager {
                                 let onSaveCallback = self.onSaveCallbacks[tableName]
                                 callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
                             }
-                            result["blLocalId"] = self.opResultIdToBlLocalId[opResultId]                            
+                            result["blLocalId"] = blLocalIds[opResultId]
                             PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: result, callback: callback)
                         }
-                            // *************************************
+                        // *************************************
                             
                         else if opResultId.contains("delete") {
-                            var tableName = self.operationTableNames[opResultId]
-                            if tableName == nil {
-                                tableName = UOWHelper.shared.getOperationTables()[opResultId]
-                            }
-                            var blLocalId = self.opResultIdToBlLocalId[opResultId]
-                            if blLocalId == nil {
-                                blLocalId = UOWHelper.shared.getOperationBlLocalIds()[opResultId]
-                            }
+                            let tableName = UOWHelper.shared.getOperationTables()[opResultId]
                             var callback = self.offlineAwareCallbacks[opResultId]
                             if callback == nil {
                                 let onRemoveCallback = self.onRemoveCallbacks[tableName!]
                                 callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onRemoveCallback?.removeResponseHandler, remoteErrorHandler: onRemoveCallback?.errorHandler)
                             }
-                            if tableName != nil, blLocalId != nil {
-                                LocalManager.shared.delete(tableName: tableName!, whereClause: "blLocalId=\(blLocalId!)", localResponseHandler: callback?.remoteResponseHandler, localErrorHandler: callback?.remoteErrorHandler)
+                            if let blLocalId = blLocalIds[opResultId], tableName != nil {
+                                LocalManager.shared.delete(tableName: tableName!, whereClause: "blLocalId=\(blLocalId)", localResponseHandler: callback?.remoteResponseHandler, localErrorHandler: callback?.remoteErrorHandler)
                             }
                         }
                     }
                     self.uow.operations.removeAll()
                     UOWHelper.shared.saveUOW(self.uow)
-                    
-                    self.operationTableNames.removeAll()
-                    UOWHelper.shared.saveOperationTables()
-                    
-                    self.opResultIdToBlLocalId.removeAll()
-                    UOWHelper.shared.saveBlLocalIds()
+                    UOWHelper.shared.removeOperationTables()
+                    UOWHelper.shared.removeOperationBlLocalIds()
                 }
                 else if let uowError = uowResult.error,
                     let failedOperation = uowError.operation,
