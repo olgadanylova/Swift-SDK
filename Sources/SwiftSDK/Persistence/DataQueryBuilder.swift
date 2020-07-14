@@ -36,6 +36,8 @@
     public var related: [String]?
     public var groupBy: [String]?
     public var havingClause: String?
+    public var dataRetrievalPolicy: RetrievalPolicy?
+    public var localStoragePolicy: LocalStoragePolicy?
     
     var isRelationsDepthSet = false
     

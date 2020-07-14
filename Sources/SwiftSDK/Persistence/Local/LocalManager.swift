@@ -168,7 +168,7 @@ class LocalManager {
         if sqlite3_prepare_v2(dbInstance, cmd, -1, &statement, nil) == SQLITE_OK, sqlite3_step(statement) == SQLITE_DONE {
             let result = select(tableName: tableName, whereClause: whereClause)
             if result is [[String : Any]],
-                let updatedObject = (result as! [[String : Any]]).first {
+                let updatedObject = (result as! [[String : Any]]).first {                
                 localResponseHandler?(updatedObject)
             }
             else if result is Fault {
@@ -431,6 +431,9 @@ class LocalManager {
                 }
                 else if value is String {
                     cmd += ", '\(value)'"
+                }
+                else if value is NSNumber {
+                    cmd += ", \(value)"
                 }
                 else if value is [String : Any],
                     let jsonString = JSONUtils.shared.dictionaryToJsonString(value as! [String : Any]) {

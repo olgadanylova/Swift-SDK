@@ -23,6 +23,7 @@ class OfflineSyncManager {
     
     static let shared = OfflineSyncManager()
     
+    var syncTables = [String]()
     var dontSyncTables = [String]()
     var offlineAwareCallbacks = [String : OfflineAwareCallback]()
     var onSaveCallbacks = [String : OnSave]()
@@ -39,15 +40,30 @@ class OfflineSyncManager {
             let syncUow = UnitOfWork()
             
             for operation in uow.operations {
-                if var payload = operation.payload as? [String : Any] {
-                    payload = PersistenceLocalHelper.shared.removeAllLocalFields(payload)
-                    operation.payload = payload
-                    syncUow.operations.append(operation)
+                var addToSyncOperations = false
+                if let operationTableName = operation.tableName {
+                    if Backendless.shared.data.isOfflineAutoSyncEnabled {
+                        if !(dontSyncTables.contains(operationTableName)) {
+                            addToSyncOperations = true
+                        }
+                    }
+                    else {
+                        if syncTables.contains(operationTableName) {
+                            addToSyncOperations = true
+                        }
+                    }
                 }
-                else {
-                    // String
-                    syncUow.operations.append(operation)
-                }
+                if addToSyncOperations {
+                    if var payload = operation.payload as? [String : Any] {
+                        payload = PersistenceLocalHelper.shared.removeAllLocalFields(payload)
+                        operation.payload = payload
+                        syncUow.operations.append(operation)
+                    }
+                    else {
+                        // String
+                        syncUow.operations.append(operation)
+                    }
+                }       
             }
             
             print("Sync operations:")
@@ -55,7 +71,7 @@ class OfflineSyncManager {
                 print("    * \(operation.opResultId!): \(operation.payload!)")
             }
             print("****************")
-                
+            
             syncUow.execute(responseHandler: { uowResult in
                 if uowResult.isSuccess,
                     let results = uowResult.results {
@@ -72,7 +88,7 @@ class OfflineSyncManager {
                             result["blLocalId"] = blLocalIds[opResultId]
                             PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: result, callback: callback)
                         }
-                        // *************************************
+                            // *************************************
                             
                         else if opResultId.contains("delete") {
                             let tableName = UOWHelper.shared.getOperationTables()[opResultId]

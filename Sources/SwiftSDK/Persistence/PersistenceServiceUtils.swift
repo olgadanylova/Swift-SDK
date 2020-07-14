@@ -201,6 +201,27 @@ class PersistenceServiceUtils {
     }
     
     func find(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        var retrievalPolicy = queryBuilder?.dataRetrievalPolicy
+        if retrievalPolicy == nil {
+            retrievalPolicy = Backendless.shared.data.dataRetrievalPolicy
+        }
+        if retrievalPolicy == .onlineOnly {
+            findOnline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .offlineOnly {
+            findOffline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .dynamic {
+            if ConnectionManager.isConnectedToNetwork() {
+                findOnline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+            else {
+                findOffline(queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+        }
+    }
+    
+    func findOnline(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         let headers = ["Content-Type": "application/json"]
         var parameters = [String: Any]()
         if let whereClause = queryBuilder?.whereClause {
@@ -268,15 +289,57 @@ class PersistenceServiceUtils {
                             else {
                                 resultArray.append(resultDictionary)
                             }
-                        }                            
+                        }
+                    }
+                    var localStoragePolicy = queryBuilder?.localStoragePolicy
+                    if localStoragePolicy == nil {
+                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
+                    }
+                    for resultDictionary in resultArray {
+                        self.saveToLocalStorage(resultDictionary, policy: localStoragePolicy!)
                     }
                     responseHandler(resultArray)
                 }
             }
         })
     }
+     
+    func findOffline(queryBuilder: DataQueryBuilder?, responseHandler: (([[String : Any]]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        let result = LocalManager.shared.select(tableName: tableName, withDeleted: false, properties: queryBuilder?.properties, whereClause: queryBuilder?.whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.sortBy, groupBy: queryBuilder?.groupBy, having: queryBuilder?.havingClause)
+        if let result = result as? [[String : Any]] {
+            var resultArray = [[String : Any]]()
+            for resultObject in result {
+                resultArray.append(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
+            }
+            responseHandler(resultArray)
+        }
+        else if result is Fault {
+            errorHandler(result as! Fault)
+        }
+    }
     
     func findFirstOrLastOrById(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        var retrievalPolicy = queryBuilder?.dataRetrievalPolicy
+        if retrievalPolicy == nil {
+            retrievalPolicy = Backendless.shared.data.dataRetrievalPolicy
+        }
+        if retrievalPolicy == .onlineOnly {
+            findFirstOrLastOrByIdOnline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .offlineOnly {
+            findFirstOrLastOrByIdOffline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+        }
+        else if retrievalPolicy == .dynamic {
+            if ConnectionManager.isConnectedToNetwork() {
+                findFirstOrLastOrByIdOnline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+            else {
+                findFirstOrLastOrByIdOffline(first: first, last: last, objectId: objectId, queryBuilder: queryBuilder, responseHandler: responseHandler, errorHandler: errorHandler)
+            }
+        }
+    }
+    
+    func findFirstOrLastOrByIdOnline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
         var restMethod = "data/\(tableName)"
         if first {
             restMethod += "/first"
@@ -352,16 +415,51 @@ class PersistenceServiceUtils {
                 if result is Fault {
                     errorHandler(result as! Fault)
                 }
-                else if let resultDictionary = (result as! JSON).dictionaryObject {
-                    if let responseDictionary = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
-                        responseHandler(responseDictionary)
+                else if var resultDictionary = (result as! JSON).dictionaryObject {
+                    if let convertedToBLDict = PersistenceHelper.shared.convertToBLType(resultDictionary) as? [String : Any] {
+                        resultDictionary = convertedToBLDict
                     }
-                    else {
-                        responseHandler(resultDictionary)
+                    var localStoragePolicy = queryBuilder?.localStoragePolicy
+                    if localStoragePolicy == nil {
+                        localStoragePolicy = Backendless.shared.data.localStoragePolicy
                     }
+                    self.saveToLocalStorage(resultDictionary, policy: localStoragePolicy!)
+                    responseHandler(resultDictionary)
                 }
             }
         })
+    }
+    
+    func findFirstOrLastOrByIdOffline(first: Bool, last: Bool, objectId: String?, queryBuilder: DataQueryBuilder?, responseHandler: (([String : Any]) -> Void)!, errorHandler: ((Fault) -> Void)!) {
+        if first || last {
+            let result = LocalManager.shared.select(tableName: tableName, withDeleted: false, properties: queryBuilder?.properties, whereClause: queryBuilder?.whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.sortBy, groupBy: queryBuilder?.groupBy, having: queryBuilder?.havingClause)
+            if let resultArray = result as? [[String : Any]] {
+                let sortedArrayAsc = resultArray.sorted(by: { ($0["created"] as? NSNumber ?? 0) < ($1["created"] as? NSNumber ?? 0) })
+                if first, let firstObject = sortedArrayAsc.first {
+                    responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(firstObject))
+                }
+                else if last, let lastObject = sortedArrayAsc.last {
+                    responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(lastObject))
+                }
+                else {
+                    responseHandler([String : Any]())
+                }
+            }
+            else if result is Fault {
+                errorHandler(result as! Fault)
+            }
+        }
+        else if objectId != nil {
+            let whereClause = "objectId='\(objectId!)'"
+            let result = LocalManager.shared.select(tableName: tableName, withDeleted: false, properties: queryBuilder?.properties, whereClause: whereClause, limit: nil, offset: nil, orderBy: queryBuilder?.sortBy, groupBy: queryBuilder?.groupBy, having: queryBuilder?.havingClause)
+            if result is [[String : Any]],
+                let resultObject = (result as! [[String : Any]]).first {
+                responseHandler(PersistenceLocalHelper.shared.prepareOfflineObjectForResponse(resultObject))
+            }
+            else if result is Fault {
+                errorHandler(result as! Fault)
+            }
+        }
     }
     
     func setOrAddRelation(columnName: String, parentObjectId: String, childrenObjectIds: [String], httpMethod: HTTPMethod, responseHandler: ((Int) -> Void)!, errorHandler: ((Fault) -> Void)!) {
@@ -835,38 +933,6 @@ class PersistenceServiceUtils {
         return nil
     }
     
-    /*func convertToGeometryType(dictionary: [String : Any]) -> [String : Any] {
-        var resultDictionary = dictionary
-        for (key, value) in dictionary {
-            if let dictValue = value as? [String : Any] {
-                if dictValue["___class"] as? String == BLPoint.geometryClassName || dictValue["type"] as? String == BLPoint.geoJsonType {
-                    resultDictionary[key] = try? GeoJSONParser.dictionaryToPoint(dictValue)
-                }
-                else if dictValue["___class"] as? String == BLLineString.geometryClassName || dictValue["type"] as? String == BLLineString.geoJsonType {
-                    resultDictionary[key] = try? GeoJSONParser.dictionaryToLineString(dictValue)
-                }
-                else if dictValue["___class"] as? String == BLPolygon.geometryClassName || dictValue["type"] as? String == BLPolygon.geoJsonType {
-                    resultDictionary[key] = try? GeoJSONParser.dictionaryToPolygon(dictValue)
-                }
-            }
-            else if let dictValue = value as? String {
-                if dictValue.contains(BLPoint.wktType) {
-                    resultDictionary[key] = try? BLPoint.fromWkt(dictValue)
-                }
-                else if dictValue.contains(BLLineString.wktType) {
-                    resultDictionary[key] = try? BLLineString.fromWkt(dictValue)
-                }
-                else if dictValue.contains(BLPolygon.wktType) {
-                    resultDictionary[key] = try? BLPolygon.fromWkt(dictValue)
-                }
-            }
-            else if var dictValue = value as? [String : Any] {
-                dictValue = convertToGeometryType(dictionary: dictValue)
-            }
-        }
-        return resultDictionary
-    }*/
-    
     func convertFromGeometryType(dictionary: [String : Any]) -> [String : Any] {
         var resultDictionary = dictionary
         for (key, value) in dictionary {            
@@ -881,5 +947,25 @@ class PersistenceServiceUtils {
             }
         }        
         return resultDictionary
+    }
+    
+    private func saveToLocalStorage(_ dictionary: [String : Any], policy: LocalStoragePolicy) {
+        if let objectId = dictionary["objectId"] as? String {
+            if policy == .storeAll {
+                let whereClause = "objectId = '\(objectId)'"
+                if LocalManager.shared.recordExists(tableName: tableName, whereClause: whereClause) {
+                    LocalManager.shared.update(tableName: tableName, newValues: dictionary, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+                else {
+                    LocalManager.shared.insert(tableName: tableName, object: dictionary, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+            }
+            else if policy == .storeUpdated {
+                let whereClause = "objectId = '\(objectId)'"
+                if LocalManager.shared.recordExists(tableName: tableName, whereClause: whereClause) {
+                    LocalManager.shared.update(tableName: tableName, newValues: dictionary, whereClause: whereClause, blPendingOperation: .none, localResponseHandler: nil, localErrorHandler: nil)
+                }
+            }
+        }
     }
 }

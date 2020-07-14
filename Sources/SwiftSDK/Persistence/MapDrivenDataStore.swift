@@ -25,7 +25,18 @@
     
     public var rt: EventHandlerForMap!
     
-    public private(set) var isOfflineAutoSyncEnabled = false
+    public private(set) var isOfflineAutoSyncEnabled: Bool {
+        get {
+            if Backendless.shared.data.isOfflineAutoSyncEnabled, !(OfflineSyncManager.shared.dontSyncTables.contains(tableName)) {
+                return true
+            }
+            else if OfflineSyncManager.shared.syncTables.contains(tableName) {
+                return true
+            }
+            return false
+        }
+        set { }
+    }
     
     private var tableName: String
     private var persistenceServiceUtils: PersistenceServiceUtils
@@ -144,6 +155,18 @@
     }
     
     // ****************************************************************************************
+    
+    public func enableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = true
+        OfflineSyncManager.shared.syncTables.append(tableName)
+        OfflineSyncManager.shared.dontSyncTables.removeAll(where: {$0 == tableName})
+    }
+    
+    public func disableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = false
+        OfflineSyncManager.shared.syncTables.removeAll(where: {$0 == tableName})
+        OfflineSyncManager.shared.dontSyncTables.append(tableName)
+    }
     
     public func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
         PersistenceServiceUtilsLocal.shared.initLocalDatabase(tableName: tableName, whereClause: nil, responseHandler: responseHandler, errorHandler: errorHandler)

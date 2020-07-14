@@ -120,4 +120,18 @@ class JSONUtils {
         }
         return nil
     }
+    
+    func jsonStringToDictionary(_ jsonString: String) -> [String : Any]? {
+        if let data = jsonString.data(using: .utf8) {
+            return try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any]
+        }
+        return nil
+    }
+    
+    func jsonStringToArray(_ jsonString: String) -> [[String : Any]]? {
+        if let data = jsonString.data(using: .utf8) {
+            return try? JSONSerialization.jsonObject(with: data, options: []) as? [[String: Any]]
+        }
+        return nil
+    }
 }

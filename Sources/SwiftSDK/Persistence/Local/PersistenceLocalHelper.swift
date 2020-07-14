@@ -63,8 +63,33 @@ class PersistenceLocalHelper {
                 else if stringValue.contains(BLPolygon.wktType), let polygon = try? BLPolygon.fromWkt(stringValue) {
                     resultDictionary[key] = polygon
                 }
+                else {
+                    if let dictionaryValue = JSONUtils.shared.jsonStringToDictionary(stringValue) {
+                        if let className = dictionaryValue["___class"] as? String,                        
+                            let customObject = PersistenceHelper.shared.dictionaryToEntity(dictionaryValue, className: className) {
+                            resultDictionary[key] = customObject
+                        }
+                        else {
+                            resultDictionary[key] = dictionaryValue
+                        }
+                    }
+                    else if let arrayValue = JSONUtils.shared.jsonStringToArray(stringValue) {
+                        var array = [Any]()
+                        for dictionaryValue in arrayValue {
+                            if let className = dictionaryValue["___class"] as? String,
+                                let customObject = PersistenceHelper.shared.dictionaryToEntity(dictionaryValue, className: className) {
+                               array.append(customObject)
+                            }
+                            else {
+                                array.append(dictionaryValue)
+                            }
+                        }
+                        resultDictionary[key] = array
+                    }
+                }
             }
         }
+        resultDictionary = PersistenceLocalHelper.shared.removeLocalTimestampAndPendingOpFields(resultDictionary)
         return resultDictionary
     }
 }

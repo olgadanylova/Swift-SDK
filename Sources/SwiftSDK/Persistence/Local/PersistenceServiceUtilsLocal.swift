@@ -404,7 +404,7 @@ class PersistenceServiceUtilsLocal {
                 if let localObjectId = localObject["objectId"] as? String {
                     // TODO
                 }
-                // else if objectId == nil: object exists only locally, remove it locally, remove uow.operation and remove opResultIdToBlLocalId
+                    // else if objectId == nil: object exists only locally, remove it locally, remove uow.operation and remove opResultIdToBlLocalId
                 else {
                     LocalManager.shared.delete(tableName: tableName, whereClause: "blLocalId=\(blLocalId!)", localResponseHandler: wrappedResponseHandler, localErrorHandler: callback?.localErrorHandler)
                     OfflineSyncManager.shared.uow.operations.removeAll(where: { ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId })
@@ -465,7 +465,7 @@ class PersistenceServiceUtilsLocal {
                         else if blPendingOperation == 1 {
                             let operations = OfflineSyncManager.shared.uow.operations
                             if operations.contains(where: { $0.tableName == tableName &&
-                            ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
+                                ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
                                 for operation in operations {
                                     if operation.tableName == tableName,
                                         var payload = operation.payload as? [String : Any],
@@ -523,13 +523,13 @@ class PersistenceServiceUtilsLocal {
                             let operations = OfflineSyncManager.shared.uow.operations
                             var removeOperations = [Int]()
                             if operations.contains(where: { $0.tableName == tableName &&
-                            ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
+                                ($0.payload as? [String : Any])?["blLocalId"] as? NSNumber == blLocalId }) {
                                 for i in 0..<operations.count {
                                     let operation = operations[i]
                                     if operation.tableName == tableName,
-                                    let payload = operation.payload as? [String : Any],
-                                    let payloadLocalId = payload["blLocalId"] as? NSNumber,
-                                    payloadLocalId == blLocalId {
+                                        let payload = operation.payload as? [String : Any],
+                                        let payloadLocalId = payload["blLocalId"] as? NSNumber,
+                                        payloadLocalId == blLocalId {
                                         if let objectId = payload["objectId"] as? String {
                                             removeOperations.append(i)
                                             LocalManager.shared.update(tableName: tableName, newValues: payload, whereClause: "blLocalId=\(blLocalId)", blPendingOperation: .delete, localResponseHandler: nil, localErrorHandler: callback?.localErrorHandler)
@@ -548,9 +548,9 @@ class PersistenceServiceUtilsLocal {
                                     }
                                 }
                                 OfflineSyncManager.shared.uow.operations = OfflineSyncManager.shared.uow.operations
-                                .enumerated()
-                                .filter { !removeOperations.contains($0.offset) }
-                                .map { $0.element }
+                                    .enumerated()
+                                    .filter { !removeOperations.contains($0.offset) }
+                                    .map { $0.element }
                             }
                             else {
                                 if let localObjects = LocalManager.shared.selectWithDeleted(tableName: tableName, whereClause: "blLocalId=\(blLocalId)") as? [[String : Any]],

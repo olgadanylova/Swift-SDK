@@ -126,7 +126,7 @@ class PersistenceHelper {
         return resultDictionary
     }
     
-    func entityToDictionary(entity: Any) -> [String: Any] {
+    func entityToDictionary(entity: Any) -> [String: Any] {        
         if let user = entity as? BackendlessUser {
             var userDict = [String : Any]()
             let userProperties = user.properties
