@@ -365,7 +365,7 @@ class PersistenceServiceUtils {
             }
         }
             
-        // relationsPageSize = nil
+            // relationsPageSize = nil
         else {
             if related != nil {
                 restMethod += "?loadRelations=\(DataTypesUtils.shared.arrayToString(array: related!))"
@@ -593,11 +593,10 @@ class PersistenceServiceUtils {
     }
     
     func getTableName(entity: Any) -> String {
-        var name = String(describing: entity)
-        if name == "BackendlessUser" {
-            name = "Users"
+        if entity is BackendlessUser.Type {
+            return "Users"
         }
-        return name
+        return String(describing: entity)
     }
     
     func getClassName(entity: Any) -> String {
@@ -665,7 +664,7 @@ class PersistenceServiceUtils {
         if let userEntity = entity as? BackendlessUser {
             let properties = userEntity.properties
             for (key, value) in properties {
-                entityDictionary[key] = value
+                entityDictionary[key] = JSONUtils.shared.objectToJson(objectToParse: value)
             }
         }
         else {
@@ -793,12 +792,10 @@ class PersistenceServiceUtils {
             let entityClassName = getClassName(entity: entity.classForCoder)
             let columnToPropertyMappings = Mappings.shared.getColumnToPropertyMappings(className: entityClassName)
             
-            for dictionaryField in dictionary.keys {
+            for dictionaryField in dictionary.keys {                
                 if !(dictionary[dictionaryField] is NSNull) {
                     if columnToPropertyMappings.keys.contains(dictionaryField) {
-                        
                         let mappedPropertyName = columnToPropertyMappings[dictionaryField]!
-                        
                         if let arrayValue = dictionary[dictionaryField] as? [Any] {
                             var result = [Any]()
                             for value in arrayValue {

@@ -22,26 +22,17 @@
 import XCTest
 @testable import SwiftSDK
 
-class UOWDeleteTests: XCTestCase {
-
+class DataUOWDeleteTests: XCTestCase {
+    
     private let backendless = Backendless.shared
     private let testObjectsUtils = TestObjectsUtils.shared
     private let timeout: Double = 20.0    
     private let tableName = "TestClass"
-
+    
     // call before all tests
     override class func setUp() {
         Backendless.shared.hostUrl = BackendlessAppConfig.hostUrl
         Backendless.shared.initApp(applicationId: BackendlessAppConfig.appId, apiKey: BackendlessAppConfig.apiKey)
-    }
-    
-    // call after all tests
-    override class func tearDown() {
-        clearTables()
-    }
-    
-    class func clearTables() {
-        Backendless.shared.data.ofTable("TestClass").removeBulk(whereClause: nil, responseHandler: { removedObjects in }, errorHandler: { fault in })
     }
     
     func test_01_delete() {
@@ -49,14 +40,16 @@ class UOWDeleteTests: XCTestCase {
         testObjectsUtils.createTestClassDictionary(responseHandler: { createdObject in
             let uow = UnitOfWork()
             let _ = uow.delete(tableName: self.tableName, objectToDelete: createdObject)
-            uow.execute(responseHandler: { uowResult in
-                XCTAssertNil(uowResult.error)
-                XCTAssertTrue(uowResult.isSuccess)
-                XCTAssertNotNil(uowResult.results)
-                expectation.fulfill()
-            }, errorHandler: {  fault in
-                XCTAssertNotNil(fault)
-                XCTFail("\(fault.code): \(fault.message!)")
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: {
+                uow.execute(responseHandler: { uowResult in
+                    XCTAssertNil(uowResult.error)
+                    XCTAssertTrue(uowResult.isSuccess)
+                    XCTAssertNotNil(uowResult.results)
+                    expectation.fulfill()
+                }, errorHandler: {  fault in
+                    XCTAssertNotNil(fault)
+                    XCTFail("\(fault.code): \(fault.message!)")
+                })
             })
         }, errorHandler: { fault in
             XCTAssertNotNil(fault)
