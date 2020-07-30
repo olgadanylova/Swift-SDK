@@ -419,7 +419,9 @@ class PersistenceHelper {
         if valueType.contains("NSDate"), value is Int {
             return DataTypesUtils.shared.intToDate(intVal: value as! Int)
         }
-        
+        if valueType.contains("Dictionary"), value is String {
+            return DataTypesUtils.shared.stringToDictionary(value as! String)
+        }
             
         // BKNDLSS-21285
         /*else if valueType.contains("NSDate"), value is String {

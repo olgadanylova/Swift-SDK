@@ -53,9 +53,15 @@ protocol IDataStore {
     func deleteRelation(columnName: String, parentObjectId: String, whereClause: String?, responseHandler: ((Int) -> Void)!, errorHandler: ((Fault) -> Void)!)
     func loadRelations(objectId: String, queryBuilder: LoadRelationsQueryBuilder, responseHandler: (([Any]) -> Void)!, errorHandler: ((Fault) -> Void)!)
     
+    func enableOfflineAutoSync()
+    func disableOfflineAutoSync()
     func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
     func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!)
     func clearLocalDatabase()
     func onSave(_ onSaveCallback: OnSave)
-    func onRemove(_ onSaveCallback: OnRemove)  
+    func onRemove(_ onSaveCallback: OnRemove)
+    func saveEventually(entity: CustomType)
+    func saveEventually(entity: CustomType, callback: OfflineAwareCallback)
+    func removeEventually(entity: CustomType)
+    func removeEventually(entity: CustomType, callback: OfflineAwareCallback)
 }

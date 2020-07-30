@@ -67,4 +67,15 @@ class DataTypesUtils {
         }
         return resultString
     }
+    
+    func stringToDictionary(_ originalString: String) -> [String : Any] {
+        if let data = originalString.data(using: .utf8) {
+            do {
+                return try JSONSerialization.jsonObject(with: data, options: []) as! [String: Any]
+            } catch {
+                return [String : Any]()
+            }
+        }
+        return [String : Any]()
+    }
 }

@@ -25,9 +25,21 @@
     
     public var rt: EventHandlerForClass!
     
-    private var entityClass: AnyClass
-    private var tableName: String
+    public private(set) var isOfflineAutoSyncEnabled: Bool {
+        get {
+            if Backendless.shared.data.isOfflineAutoSyncEnabled, !(OfflineSyncManager.shared.dontSyncTables.contains(tableName)) {
+                return true
+            }
+            else if OfflineSyncManager.shared.syncTables.contains(tableName) {
+                return true
+            }
+            return false
+        }
+        set { }
+    }
     
+    private var entityClass: AnyClass
+    private var tableName: String    
     private var persistenceServiceUtils: PersistenceServiceUtils
     
     init(entityClass: AnyClass) {
@@ -212,25 +224,136 @@
         return wrappedBlock
     }
     
-    // *******************************************
+    // ****************************************************************************************
+    
+    public func enableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = true
+        OfflineSyncManager.shared.syncTables.append(tableName)
+        OfflineSyncManager.shared.dontSyncTables.removeAll(where: {$0 == tableName})
+    }
+    
+    public func disableOfflineAutoSync() {
+        self.isOfflineAutoSyncEnabled = false
+        OfflineSyncManager.shared.syncTables.removeAll(where: {$0 == tableName})
+        OfflineSyncManager.shared.dontSyncTables.append(tableName)
+    }
     
     public func initLocalDatabase(responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-
+        PersistenceServiceUtilsLocal.shared.initLocalDatabase(tableName: tableName, whereClause: nil, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func initLocalDatabase(whereClause: String, responseHandler: (() -> Void)!, errorHandler: ((Fault) -> Void)!) {
-        
+        PersistenceServiceUtilsLocal.shared.initLocalDatabase(tableName: tableName, whereClause: whereClause, responseHandler: responseHandler, errorHandler: errorHandler)
     }
     
     public func clearLocalDatabase() {
-        
+        PersistenceServiceUtilsLocal.shared.clearLocalDatabase(tableName)
     }
     
     public func onSave(_ onSaveCallback: OnSave) {
-        
+        let wrappedSaveResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    onSaveCallback.saveResponseHandler?(resultObject)
+                }
+            }
+        }
+        OfflineSyncManager.shared.onSaveCallbacks[tableName] = OnSave(saveResponseHandler: wrappedSaveResponseHandler, errorHandler: onSaveCallback.errorHandler)
     }
     
-    public func onRemove(_ onSaveCallback: OnRemove) {
-        
+    public func onRemove(_ onRemoveCallback: OnRemove) {
+        let wrappedRemoveResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    onRemoveCallback.removeResponseHandler?(resultObject)
+                }
+            }
+        }
+        OfflineSyncManager.shared.onRemoveCallbacks[tableName] = OnRemove(removeResponseHandler: wrappedRemoveResponseHandler, errorHandler: onRemoveCallback.errorHandler)
+    }
+    
+    public func saveEventually(entity: Any) {
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: entityDictionary, callback: nil)
+    }
+    
+    public func saveEventually(entity: Any, callback: OfflineAwareCallback) {
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        let wrappedLocalResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    callback.localResponseHandler?(resultObject)
+                }
+            }
+        }
+        let wrappedRemoteResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    callback.remoteResponseHandler?(resultObject)
+                }
+            }
+        }
+        let wrappedCallback = OfflineAwareCallback(localResponseHandler: wrappedLocalResponseHandler, localErrorHandler: callback.localErrorHandler, remoteResponseHandler: wrappedRemoteResponseHandler, remoteErrorHandler: callback.remoteErrorHandler)
+        PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: entityDictionary, callback: wrappedCallback)
+    }
+    
+    public func removeEventually(entity: Any) {
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        PersistenceServiceUtilsLocal.shared.removeEventually(tableName: tableName, entity: entityDictionary, callback: nil)
+    }
+    
+    public func removeEventually(entity: Any, callback: OfflineAwareCallback) {
+        let entityDictionary = PersistenceHelper.shared.entityToDictionary(entity: entity)
+        let wrappedLocalResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    callback.localResponseHandler?(resultObject)
+                }
+            }
+        }
+        let wrappedRemoteResponseHandler: (Any) -> () = { response in
+            if let response = response as? [String : Any] {
+                let className = PersistenceHelper.shared.getClassNameWithoutModule(self.entityClass)
+                if let resultObject = PersistenceHelper.shared.dictionaryToEntity(response, className: className) {
+                    callback.remoteResponseHandler?(resultObject)
+                }
+            }
+        }
+        let wrappedCallback = OfflineAwareCallback(localResponseHandler: wrappedLocalResponseHandler, localErrorHandler: callback.localErrorHandler, remoteResponseHandler: wrappedRemoteResponseHandler, remoteErrorHandler: callback.remoteErrorHandler)
+        PersistenceServiceUtilsLocal.shared.removeEventually(tableName: tableName, entity: entityDictionary, callback: wrappedCallback)
+    }
+    
+    // ****************************************************************************************
+    
+    public func getLocalCount() -> NSNumber {
+        let count = LocalManager.shared.getNumberOfRecords(tableName, whereClause: "blPendingOperation!=2")
+        if count is NSNumber {
+            return count as! NSNumber
+        }
+        return 0
+    }
+    
+    public func getLocalRecords() -> [[String : Any]] {
+        if let localObjects = LocalManager.shared.select(tableName: tableName) as? [[String : Any]] {
+            return localObjects
+        }
+        return [[String : Any]]()
+    }
+    
+    public func checkIfTableExists() {
+        print("Table \(tableName) exists: \(LocalManager.shared.tableExists(tableName))")
+    }
+    
+    public func getTableNames() {
+        print("All local tables: \(LocalManager.shared.getTables())")
+    }
+    
+    public func getTableOperationsCount() -> Int {
+        return OfflineSyncManager.shared.uow.operations.count
     }
 }

@@ -76,8 +76,27 @@ class OfflineSyncManager {
                 if uowResult.isSuccess,
                     let results = uowResult.results {
                     for (opResultId, operationResult) in results {
-                        let blLocalIds = UOWHelper.shared.getOperationBlLocalIds()                        
-                        if var result = operationResult.result as? [String : Any],
+                        let blLocalIds = UOWHelper.shared.getOperationBlLocalIds()
+                        var resultDictionary: [String : Any]?
+                        if let result  = operationResult.result as? [String : Any] {
+                            resultDictionary = result
+                        }
+                        else if let result = operationResult.result as? NSObject {
+                            resultDictionary = PersistenceHelper.shared.entityToDictionaryWithClassProperty(entity: result)
+                        }
+                        if let tableName = resultDictionary?["___class"] as? String,
+                            (opResultId.contains("create") || opResultId.contains("update")) {
+                            var callback = self.offlineAwareCallbacks[opResultId]
+                            if callback == nil {
+                                let onSaveCallback = self.onSaveCallbacks[tableName]
+                                callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                            }
+                            resultDictionary?["blLocalId"] = blLocalIds[opResultId]
+                            if resultDictionary != nil {
+                                PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: resultDictionary!, callback: callback)
+                            }
+                        }
+                        /*if var result = operationResult.result as? [String : Any],
                             let tableName = result["___class"] as? String,
                             (opResultId.contains("create") || opResultId.contains("update")) {
                             var callback = self.offlineAwareCallbacks[opResultId]
@@ -88,6 +107,19 @@ class OfflineSyncManager {
                             result["blLocalId"] = blLocalIds[opResultId]
                             PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: result, callback: callback)
                         }
+                        else if let result = operationResult.result as? NSObject {
+                            var resultDictionary = PersistenceHelper.shared.entityToDictionaryWithClassProperty(entity: result)
+                            if let tableName = resultDictionary["___class"] as? String,
+                                (opResultId.contains("create") || opResultId.contains("update")) {
+                                var callback = self.offlineAwareCallbacks[opResultId]
+                                if callback == nil {
+                                    let onSaveCallback = self.onSaveCallbacks[tableName]
+                                    callback = OfflineAwareCallback(localResponseHandler: nil, localErrorHandler: nil, remoteResponseHandler: onSaveCallback?.saveResponseHandler, remoteErrorHandler: onSaveCallback?.errorHandler)
+                                }
+                                resultDictionary["blLocalId"] = blLocalIds[opResultId]
+                                PersistenceServiceUtilsLocal.shared.saveEventually(tableName: tableName, entity: resultDictionary, callback: callback)
+                            }
+                        }*/
                             // *************************************
                             
                         else if opResultId.contains("delete") {
